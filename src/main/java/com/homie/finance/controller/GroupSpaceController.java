@@ -36,6 +36,13 @@ public class GroupSpaceController {
         return new ApiResponse<>(200, "Danh sách không gian chung", groupSpaceService.getMyGroups());
     }
 
+    // Lấy chi tiết 1 nhóm (Kèm danh sách thành viên)
+    @GetMapping("/{id}")
+    @Operation(summary = "Lấy chi tiết nhóm", description = "Lấy thông tin nhóm và danh sách thành viên bên trong để hiển thị")
+    public ApiResponse<GroupSpace> getGroupDetails(@PathVariable String id) {
+        return new ApiResponse<>(200, "Lấy thông tin nhóm thành công", groupSpaceService.getGroupById(id));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Chỉnh sửa tên nhóm")
     public ApiResponse<GroupSpace> updateGroup(@PathVariable String id, @RequestParam String newName) {

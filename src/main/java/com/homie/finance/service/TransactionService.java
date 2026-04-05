@@ -174,6 +174,10 @@ public class TransactionService {
         User currentUser = getCurrentLoggedInUser();
         Transaction transaction = transactionRepository.findById(id).orElseThrow();
 
+        if (!transaction.getUser().getId().equals(currentUser.getId()) || !transaction.isDeleted()) {
+            throw new IllegalArgumentException("Giao dịch không hợp lệ hoặc không nằm trong thùng rác!");
+        }
+
         Wallet wallet = transaction.getWallet();
         Category category = transaction.getCategory();
         if (wallet != null && category != null) {

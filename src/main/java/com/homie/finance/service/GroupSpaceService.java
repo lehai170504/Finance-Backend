@@ -51,7 +51,7 @@ public class GroupSpaceService {
         return groupSpaceRepository.save(group);
     }
 
-    // 2. Tham gia nhóm bằng Mã Code (Dùng Repository check member để né lỗi Lazy)
+    // 2. Tham gia nhóm bằng Mã Code
     @Transactional
     public GroupSpace joinGroup(String inviteCode) {
         User me = getCurrentUser();
@@ -73,7 +73,7 @@ public class GroupSpaceService {
         User me = getCurrentUser();
         List<GroupSpace> groups = groupSpaceRepository.findByMembersContaining(me);
 
-        // Nạp size để Jackson build JSON thành viên không bị lỗi
+        // Nạp size để Jackson build JSON thành viên không bị lỗi Lazy Initialization
         groups.forEach(g -> {
             if (g.getMembers() != null) g.getMembers().size();
         });
@@ -81,11 +81,13 @@ public class GroupSpaceService {
         return groups;
     }
 
-    // 4. Chỉnh sửa tên nhóm (Chỉ Owner)
+    // 4. Chỉnh sửa tên nhóm (Đã Fix: Dùng findByIdWithMembers)
     @Transactional
     public GroupSpace updateGroup(String groupId, String newName) {
         User me = getCurrentUser();
-        GroupSpace group = groupSpaceRepository.findById(groupId)
+
+        // Dùng hàm mới để kéo luôn Members lên, khỏi xài mẹo .size() nữa
+        GroupSpace group = groupSpaceRepository.findByIdWithMembers(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhóm!"));
 
         if (!group.getOwner().getId().equals(me.getId())) {
@@ -97,15 +99,10 @@ public class GroupSpaceService {
         }
 
         group.setName(newName);
-        GroupSpace updated = groupSpaceRepository.save(group);
-
-        // Nạp members để trả về JSON đầy đủ
-        if (updated.getMembers() != null) updated.getMembers().size();
-
-        return updated;
+        return groupSpaceRepository.save(group);
     }
 
-    // 5. Giải tán nhóm (Chỉ Owner)
+    // 5. Giải tán nhóm
     @Transactional
     public void deleteGroup(String groupId) {
         User me = getCurrentUser();
@@ -119,7 +116,7 @@ public class GroupSpaceService {
         groupSpaceRepository.delete(group);
     }
 
-    // 6. Rời khỏi nhóm (Thành viên thường)
+    // 6. Rời khỏi nhóm
     @Transactional
     public void leaveGroup(String groupId) {
         User me = getCurrentUser();
@@ -138,5 +135,20 @@ public class GroupSpaceService {
         groupSpaceRepository.save(group);
     }
 
+    // 7. Lấy chi tiết nhóm (Trị dứt điểm lỗi Spam Toast trang Shopping Mall)
+    @Transactional(readOnly = true)
+    public GroupSpace getGroupById(String groupId) {
+        User me = getCurrentUser();
 
+        // Kéo Group kèm theo danh sách Members lên luôn 1 lượt
+        GroupSpace group = groupSpaceRepository.findByIdWithMembers(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhóm!"));
+
+        // Check xem có phải là thành viên không thì mới cho phép xem chi tiết
+        if (!group.getMembers().contains(me)) {
+            throw new IllegalArgumentException("Homie không có quyền xem nhóm này!");
+        }
+
+        return group;
+    }
 }
