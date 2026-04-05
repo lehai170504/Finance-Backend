@@ -57,7 +57,8 @@ public class SecurityConfig {
 
                         // Thay đổi từ hasRole sang hasAuthority để tránh lỗi ROLE_ prefix nếu BE homie chưa chuẩn
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/categories/**").authenticated() // Thêm dòng này để test categories
+                        .requestMatchers("/api/categories/**").authenticated()
+                        .requestMatchers("/api/notifications/**").authenticated()
 
                         .anyRequest().authenticated()
                 )
