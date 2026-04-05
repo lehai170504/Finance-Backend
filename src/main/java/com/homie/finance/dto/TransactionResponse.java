@@ -15,4 +15,6 @@ public class TransactionResponse implements Serializable {
     private String categoryType;
     private String receiptUrl;
     private String walletName;
+    private String groupId;
+    private String groupName;
 }

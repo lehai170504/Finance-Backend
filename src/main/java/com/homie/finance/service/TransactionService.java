@@ -75,6 +75,10 @@ public class TransactionService {
         transaction.setUser(currentUser);
         transaction.setDeleted(false);
 
+        if (transaction.getCategory() != null && "EXPENSE".equals(transaction.getCategory().getType())) {
+            checkBudgetAndAlert(currentUser, category, request);
+        }
+
         if (groupId != null && !groupId.isEmpty()) {
             GroupSpace group = groupSpaceRepository.findById(groupId).orElseThrow();
             transaction.setGroupSpace(group);
@@ -90,7 +94,7 @@ public class TransactionService {
         Set<User> members = group.getMembers();
         if (members.size() <= 1) return;
 
-        double shareAmount = t.getAmount() / members.size();
+        double shareAmount = Math.floor(t.getAmount() / members.size());
 
         for (User member : members) {
             if (!member.getId().equals(t.getUser().getId())) {
@@ -101,6 +105,10 @@ public class TransactionService {
                 debt.setGroup(group);
                 debt.setSettled(false);
                 debtRepository.save(debt);
+
+                String msg = "Bạn có khoản nợ mới: " + String.format("%.0f", shareAmount) +
+                        "đ từ " + t.getUser().getUsername() + " cho \"" + t.getNote() + "\"";
+                notificationService.createNotification(member, msg);
             }
         }
     }
@@ -304,8 +312,14 @@ public class TransactionService {
                     LocalDate endDate = YearMonth.of(year, month).atEndOfMonth();
                     Double spent = transactionRepository.sumAmountByUserAndCategoryAndDateBetween(currentUser, category, startDate, endDate);
                     if (spent == null) spent = 0.0;
+
                     if (spent + request.getAmount() > limit) {
+                        // Gửi Email (Cũ)
                         alertService.sendBudgetAlertEmail(currentUser.getEmail(), currentUser.getUsername(), category.getName(), limit);
+
+                        String msg = "Cảnh báo: Bạn đã chi tiêu vượt định mức của danh mục " + category.getName() +
+                                " (Hạn mức: " + String.format("%.0f", limit) + "đ)";
+                        notificationService.createNotification(currentUser, msg);
                     }
                 });
     }
@@ -336,7 +350,7 @@ public class TransactionService {
         debtRepository.save(debt);
 
         String msg = currentUser.getUsername() + " đã xác nhận bạn trả xong khoản nợ " + debt.getAmount() + "đ. Hết nợ nần nhé!";
-        notificationService.sendToUser(debt.getDebtor(), msg);
+        notificationService.createNotification(debt.getDebtor(), msg);
     }
 
     @Transactional(readOnly = true)
@@ -370,6 +384,10 @@ public class TransactionService {
         }
         if (t.getWallet() != null) {
             res.setWalletName(t.getWallet().getName());
+        }
+        if (t.getGroupSpace() != null) {
+            res.setGroupName(t.getGroupSpace().getName());
+            res.setGroupId(t.getGroupSpace().getId());
         }
         return res;
     }
