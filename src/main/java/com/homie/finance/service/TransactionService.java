@@ -339,6 +339,20 @@ public class TransactionService {
         notificationService.sendToUser(debt.getDebtor(), msg);
     }
 
+    @Transactional(readOnly = true)
+    public List<DebtResponse> getGroupDebts(String groupId) {
+        return debtRepository.findByGroupIdAndIsSettledFalse(groupId).stream().map(debt -> {
+            DebtResponse res = new DebtResponse();
+            res.setId(debt.getId());
+            res.setAmount(debt.getAmount());
+            if (debt.getCreditor() != null) res.setCreditorName(debt.getCreditor().getUsername());
+            if (debt.getDebtor() != null) res.setDebtorName(debt.getDebtor().getUsername());
+            res.setSettled(debt.isSettled());
+            return res;
+        }).collect(Collectors.toList());
+    }
+
+
     // =========================================================
     // --- MAPPING ---
     // =========================================================

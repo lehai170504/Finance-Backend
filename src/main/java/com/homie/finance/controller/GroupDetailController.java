@@ -1,14 +1,16 @@
 package com.homie.finance.controller;
 
 import com.homie.finance.dto.ApiResponse;
+import com.homie.finance.dto.DebtResponse;
 import com.homie.finance.dto.GroupStatsResponse;
 import com.homie.finance.service.TransactionService;
-import com.homie.finance.repository.DebtRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/groups/details")
@@ -16,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 public class GroupDetailController {
 
     @Autowired private TransactionService transactionService;
-    @Autowired private DebtRepository debtRepository;
 
     @GetMapping("/{groupId}/stats")
     @Operation(
@@ -42,12 +43,13 @@ public class GroupDetailController {
             summary = "Lấy danh sách Nợ nần chưa thanh toán",
             description = "Liệt kê tất cả các khoản nợ phát sinh từ việc chia hóa đơn trong nhóm (Ai nợ ai, bao nhiêu tiền) chưa được xác nhận thanh toán."
     )
-    public ApiResponse<?> getDebts(
+    public ApiResponse<List<DebtResponse>> getDebts(
             @Parameter(description = "ID dạng UUID của Nhóm cần xem nợ nần", example = "550e8400-e29b-41d4-a716-446655440000")
             @PathVariable String groupId) {
 
-        return new ApiResponse<>(200, "Danh sách nợ nần hiện tại của nhóm",
-                debtRepository.findByGroupIdAndIsSettledFalse(groupId));
+        // Gọi qua Service thay vì Repository
+        List<DebtResponse> debts = transactionService.getGroupDebts(groupId);
+        return new ApiResponse<>(200, "Danh sách nợ nần hiện tại của nhóm", debts);
     }
 
     @PostMapping("/debts/{debtId}/settle")
