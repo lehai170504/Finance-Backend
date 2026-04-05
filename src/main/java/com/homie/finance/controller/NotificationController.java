@@ -3,15 +3,19 @@ package com.homie.finance.controller;
 import com.homie.finance.dto.ApiResponse;
 import com.homie.finance.entity.Notification;
 import com.homie.finance.entity.User;
+import com.homie.finance.repository.NotificationEmitterRepository; // 🆕 Import kho chứa RAM
 import com.homie.finance.repository.NotificationRepository;
 import com.homie.finance.repository.UserRepository;
 import com.homie.finance.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -22,10 +26,37 @@ public class NotificationController {
     @Autowired private NotificationService notificationService;
     @Autowired private UserRepository userRepository;
     @Autowired private NotificationRepository notificationRepository;
+    @Autowired private NotificationEmitterRepository emitterRepository;
 
     private User getCurrentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByUsername(username).orElseThrow();
+    }
+
+    @GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Đăng ký nhận thông báo Realtime (Dành cho FE EventSource)")
+    public SseEmitter subscribe() {
+        User currentUser = getCurrentUser();
+
+        // Tạo emitter với timeout 1 tiếng (3600000ms)
+        SseEmitter emitter = new SseEmitter(3600000L);
+
+        // Lưu vào kho để Service có thể tìm thấy và bắn tin
+        emitterRepository.add(currentUser.getId(), emitter);
+
+        // Các callback để dọn dẹp RAM khi kết nối bị ngắt
+        emitter.onCompletion(() -> emitterRepository.remove(currentUser.getId()));
+        emitter.onTimeout(() -> emitterRepository.remove(currentUser.getId()));
+        emitter.onError((e) -> emitterRepository.remove(currentUser.getId()));
+
+        // Bắn một tin nhắn chào mừng để giữ kết nối không bị timeout ngay lập tức
+        try {
+            emitter.send(SseEmitter.event().name("init").data("Homie Realtime Connected!"));
+        } catch (IOException e) {
+            emitterRepository.remove(currentUser.getId());
+        }
+
+        return emitter;
     }
 
     @GetMapping
@@ -40,7 +71,6 @@ public class NotificationController {
         long count = notificationRepository.countByUserAndIsReadFalse(getCurrentUser());
         return new ApiResponse<>(200, "Thành công", count);
     }
-
 
     @PutMapping("/read")
     @Operation(summary = "Đánh dấu đã đọc (Truyền list mảng ID ['id1', 'id2'])")
