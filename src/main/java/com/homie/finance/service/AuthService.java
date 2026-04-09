@@ -12,7 +12,7 @@ import com.homie.finance.entity.BlacklistedToken;
 import com.homie.finance.entity.User;
 import com.homie.finance.repository.BlacklistedTokenRepository;
 import com.homie.finance.repository.UserRepository;
-import com.homie.finance.util.JwtUtil;
+import com.homie.finance.utils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;

@@ -5,7 +5,7 @@ import com.homie.finance.entity.RefreshToken;
 import com.homie.finance.repository.RefreshTokenRepository;
 import com.homie.finance.service.AuthService;
 import com.homie.finance.service.RefreshTokenService;
-import com.homie.finance.util.JwtUtil;
+import com.homie.finance.utils.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

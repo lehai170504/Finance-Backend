@@ -1,4 +1,4 @@
-package com.homie.finance.util;
+package com.homie.finance.utils;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;

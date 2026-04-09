@@ -2,6 +2,9 @@ package com.homie.finance.controller;
 
 import com.homie.finance.dto.*;
 import com.homie.finance.entity.Transaction;
+import com.homie.finance.entity.TransactionLog;
+import com.homie.finance.service.LogService;
+import com.homie.finance.service.OcrService;
 import com.homie.finance.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,6 +24,8 @@ public class TransactionController {
 
     @Autowired
     private TransactionService transactionService;
+    @Autowired
+    private OcrService ocrService;
 
     // --- NHÓM 1: LẤY DANH SÁCH & TÌM KIẾM ---
 
@@ -102,7 +107,6 @@ public class TransactionController {
         return new ApiResponse<>(200, "Cập nhật thành công!", data);
     }
 
-    // 💡 ĐÃ SỬA: Thay đổi nội dung chú thích cho chuẩn với Soft Delete
     @DeleteMapping("/{id}")
     @Operation(summary = "Xóa giao dịch (Vào thùng rác)", description = "Chuyển giao dịch vào thùng rác (Soft Delete) và TỰ ĐỘNG hoàn tiền lại cho Ví.")
     public ApiResponse<String> deleteTransaction(
@@ -160,4 +164,20 @@ public class TransactionController {
         PageResponse<TransactionResponse> data = transactionService.getGroupTransactions(groupId, page, size);
         return new ApiResponse<>(200, "Lịch sử chi tiêu của nhóm", data);
     }
+
+    @GetMapping("/suggest-category")
+    @Operation(summary = "Gợi ý danh mục thông minh", description = "Dựa vào ghi chú (note) để trả về ID danh mục phù hợp nhất.")
+    public ApiResponse<String> suggestCategory(@RequestParam String note) {
+        String suggestedId = transactionService.suggestCategoryId(note);
+        return new ApiResponse<>(200, "Gợi ý danh mục", suggestedId);
+    }
+
+    @PostMapping(value = "/analyze-receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Phân tích hóa đơn (OCR)", description = "Đọc ảnh hóa đơn và trả về số tiền, ghi chú để Frontend tự điền form.")
+    public ApiResponse<OcrResponse> analyzeReceipt(
+            @Parameter(description = "File ảnh hóa đơn") @RequestPart("file") MultipartFile file) {
+        OcrResponse data = ocrService.analyzeReceipt(file);
+        return new ApiResponse<>(200, "Phân tích hóa đơn thành công!", data);
+    }
+
 }

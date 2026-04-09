@@ -83,4 +83,15 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     // 9. Lấy toàn bộ giao dịch nhóm (Không phân trang)
     List<Transaction> findAllByGroupSpaceIdAndIsDeletedFalse(String groupSpaceId);
 
+    @Query("SELECT t.category FROM Transaction t " +
+            "WHERE t.user = :user " +
+            "AND LOWER(t.note) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "AND t.isDeleted = false " +
+            "ORDER BY t.date DESC")
+    List<Category> findSuggestedCategory(
+            @Param("user") User user,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
 }

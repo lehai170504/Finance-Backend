@@ -2,7 +2,7 @@ package com.homie.finance.config;
 
 import com.homie.finance.repository.BlacklistedTokenRepository;
 import com.homie.finance.service.CustomUserDetailsService;
-import com.homie.finance.util.JwtUtil;
+import com.homie.finance.utils.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

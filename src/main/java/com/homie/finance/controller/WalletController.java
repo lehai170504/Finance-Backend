@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/wallets")
-@Tag(name = "8. Wallet", description = "Quản lý nguồn tiền (Ví cá nhân, Thẻ ngân hàng...)")
+@Tag(name = "9. Wallet", description = "Quản lý nguồn tiền (Ví cá nhân, Thẻ ngân hàng...)")
 public class WalletController {
 
     @Autowired
