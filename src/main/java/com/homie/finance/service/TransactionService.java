@@ -390,15 +390,23 @@ public class TransactionService {
         res.setNote(t.getNote());
         res.setDate(t.getDate());
         res.setReceiptUrl(t.getReceiptUrl());
+
         if (t.getCategory() != null) {
             res.setCategoryName(t.getCategory().getName());
             res.setCategoryType(t.getCategory().getType());
         }
         if (t.getWallet() != null) res.setWalletName(t.getWallet().getName());
+
         if (t.getGroupSpace() != null) {
             res.setGroupName(t.getGroupSpace().getName());
             res.setGroupId(t.getGroupSpace().getId());
         }
+
+        if (t.getUser() != null) {
+            res.setUserId(t.getUser().getId());
+            res.setUserName(t.getUser().getUsername());
+        }
+
         return res;
     }
 

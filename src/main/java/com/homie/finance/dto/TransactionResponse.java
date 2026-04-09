@@ -17,4 +17,6 @@ public class TransactionResponse implements Serializable {
     private String walletName;
     private String groupId;
     private String groupName;
+    private String userId;
+    private String userName;
 }
