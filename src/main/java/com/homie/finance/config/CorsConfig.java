@@ -9,10 +9,15 @@ public class CorsConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**") // Mở cửa cho TẤT CẢ các đường dẫn API của mình
-                .allowedOriginPatterns("*") // Cho phép TẤT CẢ các Frontend (React, Vue, Mobile) gọi vào
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // Cho phép các hành động này
-                .allowedHeaders("*") // Cho phép gửi mọi loại Header (đặc biệt là Authorization chứa Token JWT)
-                .allowCredentials(true); // Cho phép gửi Cookie/Token
+        registry.addMapping("/**")
+                .allowedOrigins(
+                        "https://finance-website-pi.vercel.app",
+                        "http://localhost:3000"
+                )
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
+                .allowedHeaders("*")
+                .exposedHeaders("Authorization")
+                .allowCredentials(true)
+                .maxAge(3600);
     }
 }
