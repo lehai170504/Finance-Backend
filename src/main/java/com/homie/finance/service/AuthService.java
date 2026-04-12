@@ -4,20 +4,22 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
-import com.homie.finance.dto.GoogleLoginRequest;
-import com.homie.finance.dto.LoginRequest;
-import com.homie.finance.dto.RegisterRequest;
-import com.homie.finance.dto.UserResponse;
+import com.homie.finance.dto.*;
 import com.homie.finance.entity.BlacklistedToken;
+import com.homie.finance.entity.RefreshToken;
 import com.homie.finance.entity.User;
 import com.homie.finance.repository.BlacklistedTokenRepository;
+import com.homie.finance.repository.RefreshTokenRepository;
 import com.homie.finance.repository.UserRepository;
 import com.homie.finance.utils.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.UUID;
@@ -30,18 +32,40 @@ public class AuthService {
     @Autowired private JwtUtil jwtUtil;
     @Autowired private EmailService emailService;
     @Autowired private BlacklistedTokenRepository blacklistRepository;
-    @Autowired
-    private RefreshTokenService refreshTokenService;
+    @Autowired private RefreshTokenService refreshTokenService;
+    @Autowired private TwoFactorAuthService twoFactorAuthService;
+    @Autowired private RefreshTokenRepository refreshTokenRepository;
+    @Autowired private CloudinaryService cloudinaryService;
 
     @Value("${google.client-id}")
     private String googleClientId;
 
-    // 1. ĐĂNG KÝ (Check trùng cả Username lẫn Email)
+    // ==============================================================
+    // HÀM DÙNG CHUNG (Xử lý trả về Token thật hoặc Token tạm cho 2FA)
+    // ==============================================================
+    private AuthResponse processUserLogin(User user) {
+        if (user.is2faEnabled()) {
+            String tempToken = jwtUtil.generateTempToken(user.getId());
+            AuthResponse response = new AuthResponse();
+            response.set2faRequired(true);
+            response.setTempToken(tempToken);
+            return response;
+        }
+
+        String accessToken = jwtUtil.generateToken(user.getUsername());
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getUsername());
+        return new AuthResponse(accessToken, refreshToken.getToken(), "Bearer", user.getUsername());
+    }
+
+    // ==============================================================
+    // 1. ĐĂNG KÝ
+    // ==============================================================
+    @Transactional
     public String register(RegisterRequest request) {
-        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+        if (userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Tên đăng nhập đã tồn tại!");
         }
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email này đã được sử dụng!");
         }
 
@@ -55,9 +79,11 @@ public class AuthService {
         return "Đăng ký thành công!";
     }
 
-    // 2. ĐĂNG NHẬP BẰNG EMAIL
-    public String login(LoginRequest request) {
-        // Tìm User theo Email (request.getUsername() chứa email từ FE)
+    // ==============================================================
+    // 2. ĐĂNG NHẬP BẰNG EMAIL (Tích hợp Cảnh báo IP lạ & 2FA)
+    // ==============================================================
+    @Transactional
+    public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         User user = userRepository.findByEmail(request.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("Email hoặc mật khẩu không chính xác!"));
 
@@ -65,12 +91,19 @@ public class AuthService {
             throw new IllegalArgumentException("Email hoặc mật khẩu không chính xác!");
         }
 
-        // Quan trọng: In thẻ Token dựa trên Username chuẩn trong DB
-        return jwtUtil.generateToken(user.getUsername());
+        String currentIp = getClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+        checkAndAlertUnrecognizedDevice(user, currentIp, userAgent);
+
+        // Gọi hàm dùng chung
+        return processUserLogin(user);
     }
 
-    // 3. ĐĂNG NHẬP GOOGLE
-    public String loginWithGoogle(GoogleLoginRequest request) {
+    // ==============================================================
+    // 3. ĐĂNG NHẬP GOOGLE (Tích hợp Cảnh báo IP lạ & 2FA)
+    // ==============================================================
+    @Transactional
+    public AuthResponse loginWithGoogle(GoogleLoginRequest request, HttpServletRequest httpRequest) {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
                     .setAudience(Collections.singletonList(googleClientId)).build();
@@ -84,20 +117,105 @@ public class AuthService {
             if (user == null) {
                 user = new User();
                 user.setEmail(email);
-                user.setUsername(email); // User Google dùng email làm username luôn
+                user.setUsername(email);
                 user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
                 user = userRepository.save(user);
             }
-            return jwtUtil.generateToken(user.getUsername());
+
+            String currentIp = getClientIp(httpRequest);
+            String userAgent = httpRequest.getHeader("User-Agent");
+            checkAndAlertUnrecognizedDevice(user, currentIp, userAgent);
+
+            // Gọi hàm dùng chung
+            return processUserLogin(user);
         } catch (Exception e) {
             throw new RuntimeException("Lỗi Google Auth: " + e.getMessage());
         }
     }
 
-    //4. LẤY THÔNG TIN NGƯỜI DÙNG
+    // ==============================================================
+    // CÁC HÀM XỬ LÝ BẢO MẬT & THIẾT BỊ
+    // ==============================================================
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+
+        return ip.split(",")[0].trim();
+    }
+
+    @Async
+    public void checkAndAlertUnrecognizedDevice(User user, String currentIp, String userAgent) {
+        if (user.getLastLoginIp() != null && !currentIp.equals(user.getLastLoginIp())) {
+
+            String subject = "Cảnh báo đăng nhập từ thiết bị lạ";
+            String content = String.format(
+                    "Chào %s,\n\n" +
+                            "Tài khoản Homie Finance của bạn vừa được đăng nhập từ một thiết bị hoặc vị trí mới.\n\n" +
+                            " Địa chỉ IP: %s\n" +
+                            " Thiết bị/Trình duyệt: %s\n\n" +
+                            "Nếu đây không phải là bạn, hãy đăng nhập và đổi mật khẩu ngay lập tức để bảo vệ tài sản của mình.\n\n" +
+                            "Trân trọng,\nĐội ngũ Bảo mật Homie Finance.",
+                    user.getUsername(), currentIp, userAgent
+            );
+
+            emailService.sendSimpleEmail(user.getEmail(), content, subject);
+        }
+
+        user.setLastLoginIp(currentIp);
+        userRepository.save(user);
+    }
+
+    // ==============================================================
+    // CÀI ĐẶT 2FA (BẬT/TẮT BẢO MẬT 2 LỚP)
+    // ==============================================================
+    @Transactional
+    public String setup2FA() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+        return twoFactorAuthService.generateSecretKey(user);
+    }
+
+    @Transactional
+    public void confirmAndEnable2FA(int code) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+        if (twoFactorAuthService.verifyCode(user.getTotpSecret(), code)) {
+            user.set2faEnabled(true);
+            userRepository.save(user);
+        } else {
+            throw new IllegalArgumentException("Mã xác nhận không đúng, vui lòng thử lại!");
+        }
+    }
+
+    @Transactional
+    public void disable2FA(String password) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new IllegalArgumentException("Mật khẩu không chính xác!");
+        }
+
+        user.set2faEnabled(false);
+        user.setTotpSecret(null);
+        userRepository.save(user);
+    }
+
+    // ==============================================================
+    // THÔNG TIN USER & QUÊN MẬT KHẨU
+    // ==============================================================
     public UserResponse getMyInfo() {
-        String username = org.springframework.security.core.context.SecurityContextHolder
-                .getContext().getAuthentication().getName();
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại!"));
 
@@ -109,14 +227,12 @@ public class AuthService {
                 .build();
     }
 
-    // 5. Yêu cầu cấp OTP
+    @Transactional
     public void forgotPassword(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email này chưa đăng ký homie ơi!"));
 
-        //CHỐNG SPAM: Chỉ cho phép gửi lại mã sau 60 giây
         if (user.getOtpExpiry() != null) {
-            // Thời điểm gửi = Thời điểm hết hạn - 5 phút (300s)
             long secondsSinceLastSend = java.time.Duration.between(
                     user.getOtpExpiry().minusSeconds(300),
                     java.time.Instant.now()
@@ -127,17 +243,15 @@ public class AuthService {
             }
         }
 
-        // Tạo mã 6 số ngẫu nhiên
         String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
         user.setOtp(otp);
-        user.setOtpExpiry(java.time.Instant.now().plusSeconds(300)); // Hết hạn sau 5 phút
+        user.setOtpExpiry(java.time.Instant.now().plusSeconds(300));
         userRepository.save(user);
 
-        // Gửi mail (Tận dụng EmailService cũ)
         emailService.sendSimpleEmail(email, "Mã OTP của bạn là: " + otp, "Mã xác thực đổi mật khẩu");
     }
 
-    // 6. Đổi mật khẩu mới bằng OTP
+    @Transactional
     public void resetPassword(String email, String otp, String newPassword) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("Email không tồn tại!"));
@@ -147,19 +261,18 @@ public class AuthService {
             throw new IllegalArgumentException("Mã OTP sai hoặc đã hết hạn rồi!");
         }
 
-        // OTP đúng -> Băm mật khẩu mới và xóa OTP cũ
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setOtp(null);
         user.setOtpExpiry(null);
         userRepository.save(user);
     }
 
-    // Đổi Username hoặc các thông tin cơ bản
+    @Transactional
     public UserResponse updateProfile(String newUsername) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(currentUsername).orElseThrow();
 
-        if (userRepository.findByUsername(newUsername).isPresent()) {
+        if (userRepository.existsByUsername(newUsername)) {
             throw new IllegalArgumentException("Username này đã có người dùng rồi!");
         }
 
@@ -168,7 +281,7 @@ public class AuthService {
         return UserResponse.builder().id(user.getId()).username(user.getUsername()).email(user.getEmail()).build();
     }
 
-    // Đổi mật khẩu (Cần nhập mật khẩu cũ để xác nhận)
+    @Transactional
     public void changePassword(String oldPassword, String newPassword) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(currentUsername).orElseThrow();
@@ -181,29 +294,78 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    @Transactional
     public void logout(String token) {
-        // 1. Cắt bỏ chữ "Bearer " (nhớ check null để tránh lỗi substring)
         if (token == null || !token.startsWith("Bearer ")) {
             throw new IllegalArgumentException("Token không hợp lệ!");
         }
         String jwt = token.substring(7);
 
-        // 2. Lưu vào Blacklist
         BlacklistedToken blacklisted = new BlacklistedToken();
         blacklisted.setToken(jwt);
-
-        // FIX LỖI 1: Chuyển từ Date sang Instant chuẩn xác
         blacklisted.setExpiryDate(jwtUtil.extractExpiration(jwt).toInstant());
-
         blacklistRepository.save(blacklisted);
 
-        // 3. Xóa Refresh Token
         String username = jwtUtil.extractUsername(jwt);
-
-        // FIX LỖI 2: Dùng orElseThrow để an toàn và code sạch hơn
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
 
         refreshTokenService.deleteByUserId(user.getId());
+    }
+
+    @Transactional
+    public AuthResponse verify2FA(Verify2FaRequest req) {
+        String userId = jwtUtil.getUserIdFromTempToken(req.getTempToken());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Token tạm không hợp lệ hoặc đã hết hạn!"));
+
+        if (!twoFactorAuthService.verifyCode(user.getTotpSecret(), req.getCode())) {
+            throw new IllegalArgumentException("Mã 2FA không chính xác!");
+        }
+
+        // Nếu đúng mã -> Sinh thẻ thật
+        String accessToken = jwtUtil.generateToken(user.getUsername());
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getUsername());
+        return new AuthResponse(accessToken, refreshToken.getToken(), "Bearer", user.getUsername());
+    }
+
+    @Transactional
+    public AuthResponse refreshToken(String requestToken) {
+        return refreshTokenRepository.findByToken(requestToken)
+                .map(refreshTokenService::verifyExpiration)
+                .map(RefreshToken::getUser)
+                .map(user -> {
+                    String newAccessToken = jwtUtil.generateToken(user.getUsername());
+                    return new AuthResponse(newAccessToken, requestToken, "Bearer", user.getUsername());
+                })
+                .orElseThrow(() -> new RuntimeException("Refresh Token không hợp lệ hoặc đã hết hạn!"));
+    }
+
+    @Transactional
+    public UserResponse uploadAvatar(org.springframework.web.multipart.MultipartFile file) {
+        try {
+            // Lấy user đang đăng nhập
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+
+            // Upload ảnh lên Cloudinary
+            String imageUrl = cloudinaryService.uploadImage(file);
+
+            // Lưu link vào DB
+            user.setAvatarUrl(imageUrl);
+            userRepository.save(user);
+
+            // Trả về thông tin mới (Nhớ map cái avatarUrl vào nhé)
+            return UserResponse.builder()
+                    .id(user.getId())
+                    .username(user.getUsername())
+                    .email(user.getEmail())
+                    .role(user.getRole().name())
+                    .avatarUrl(user.getAvatarUrl()) // Trả về cho FE
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi upload ảnh: " + e.getMessage());
+        }
     }
 }

@@ -1,9 +1,11 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="true" type="Application" factoryName="Application">
     <envs>
+      <env name="DB_PASS" value="123456" />
       <env name="DB_URL" value="jdbc:postgresql://localhost:5432/financedb" />
       <env name="DB_USER" value="postgres" />
-      <env name="DB_PASS" value="123456" />
+      <env name="MAIL_PASS" value="otqwegkwdsmiyhwe" />
+      <env name="CLOUDINARY_SECRET" value="TTX7PF5JczSZieph1jO_o7ICPLc" />
     </envs>
     <module name="personal-finance" />
     <method v="2">

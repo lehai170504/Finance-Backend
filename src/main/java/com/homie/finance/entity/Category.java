@@ -23,7 +23,6 @@ public class Category {
     @Schema(description = "Phân loại: INCOME (Thu) hoặc EXPENSE (Chi)", example = "EXPENSE")
     private String type;
 
-    // 💡 MỚI: Thêm trường icon để lưu tên icon hiển thị trên Android
     @NotBlank(message = "Chọn một cái icon cho chất nhé homie!")
     @Schema(description = "Tên định danh của Icon", example = "ic_fastfood")
     private String icon;

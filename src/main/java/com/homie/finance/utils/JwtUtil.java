@@ -15,11 +15,13 @@ public class JwtUtil {
 
     private final String SECRET_KEY = "DayLaMotCaiKhoaBiMatCucKyDaiVaKhoDoanDeBaoMatToiThieu256Bits";
     private final long EXPIRATION_TIME = 86400000; // 24h
+    private final long TEMP_EXPIRATION_TIME = 300000; // 5 phút (dành cho 2FA)
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
     }
 
+    // 1. TẠO TOKEN CHÍNH THỨC (Dùng cho mọi API)
     public String generateToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
@@ -27,6 +29,31 @@ public class JwtUtil {
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    // 2. TẠO TOKEN TẠM THỜI (Chỉ dùng lúc chờ nhập mã 2FA)
+    public String generateTempToken(String userId) {
+        return Jwts.builder()
+                .setSubject(userId)
+                .claim("isTemp", true)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + TEMP_EXPIRATION_TIME))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // 3. LẤY USER_ID TỪ TOKEN TẠM
+    public String getUserIdFromTempToken(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            // Kiểm tra xem có đúng là token tạm không
+            if (claims != null && Boolean.TRUE.equals(claims.get("isTemp", Boolean.class))) {
+                return claims.getSubject(); // Trả về userId
+            }
+            throw new RuntimeException("Token không hợp lệ để xác thực 2FA!");
+        } catch (Exception e) {
+            throw new RuntimeException("Token tạm không hợp lệ hoặc đã hết hạn (Quá 5 phút)!");
+        }
     }
 
     public String extractUsername(String token) {
@@ -63,6 +90,9 @@ public class JwtUtil {
         try {
             Claims claims = extractAllClaims(token);
             if (claims == null) return false;
+            // Kiểm tra token này KHÔNG PHẢI là token tạm
+            if (Boolean.TRUE.equals(claims.get("isTemp", Boolean.class))) return false;
+
             return !claims.getExpiration().before(new Date());
         } catch (Exception e) {
             return false;

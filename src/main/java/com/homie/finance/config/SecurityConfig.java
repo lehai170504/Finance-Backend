@@ -32,7 +32,6 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // --- FIX LỖI CORS TẠI ĐÂY ---
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -64,6 +63,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/2fa/setup", "/api/auth/2fa/confirm", "/api/auth/2fa/disable").authenticated()
+
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/swagger-ui/**",
@@ -73,6 +74,8 @@ public class SecurityConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
+
+                        // CÁC QUYỀN KHÁC GIỮ NGUYÊN
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
                         .anyRequest().authenticated()
                 )

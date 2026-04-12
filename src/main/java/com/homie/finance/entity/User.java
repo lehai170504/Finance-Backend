@@ -31,6 +31,27 @@ public class User {
     private String otp;
     private java.time.Instant otpExpiry;
 
+    @Column(name = "avatar_url")
+    @Schema(description = "Link ảnh đại diện")
+    private String avatarUrl;
+
+    // ==========================================
+    // KHU VỰC BẢO MẬT & 2FA (TRÙM CUỐI)
+    // ==========================================
+
+    @Column(name = "totp_secret")
+    @Schema(description = "Khóa bí mật cho Google Authenticator (TOTP)")
+    private String totpSecret;
+
+    @Column(name = "is_2fa_enabled", nullable = false)
+    @Schema(description = "Trạng thái bật/tắt bảo mật 2 lớp", example = "false")
+    private boolean is2faEnabled = false; // Mặc định tạo tài khoản là tắt 2FA
+
+    @Column(name = "last_login_ip")
+    @Schema(description = "IP của lần đăng nhập gần nhất để cảnh báo bảo mật", example = "192.168.1.1")
+    private String lastLoginIp;
+
+
     // ==========================================
     // KHU VỰC PHÂN QUYỀN (ROLE)
     // ==========================================
