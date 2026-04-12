@@ -224,6 +224,8 @@ public class AuthService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole().name())
+                .avatarUrl(user.getAvatarUrl())
+                .is2faEnabled(user.is2faEnabled())
                 .build();
     }
 

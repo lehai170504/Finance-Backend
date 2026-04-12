@@ -10,4 +10,5 @@ public class UserResponse {
     private String email;
     private String role;
     private String avatarUrl;
+    private boolean is2faEnabled;
 }
