@@ -1,10 +1,12 @@
 package com.homie.finance.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import java.time.Instant;
 
 @Entity
 @Table(name = "users")
@@ -16,20 +18,25 @@ public class User {
     private String id;
 
     @NotBlank(message = "Tên đăng nhập không được để trống")
-    @Column(unique = true) // Đảm bảo mỗi người 1 username, không ai trùng ai
+    @Column(unique = true, length = 50)
     @Schema(description = "Tên tài khoản", example = "homiedev")
     private String username;
 
     @NotBlank(message = "Mật khẩu là bắt buộc")
-    @Schema(description = "Mật khẩu (Sẽ được mã hóa)", example = "123456")
+    @Column(nullable = false)
+    @JsonIgnore // Bảo mật: Không bao giờ trả về password qua API
     private String password;
 
+    @NotBlank(message = "Email không được để trống")
     @Email(message = "Email không hợp lệ")
+    @Column(unique = true, nullable = false) // Đảm bảo Email không trùng lặp
     @Schema(description = "Email liên hệ", example = "homie@gmail.com")
     private String email;
 
+    @JsonIgnore // OTP cũng là dữ liệu nhạy cảm
     private String otp;
-    private java.time.Instant otpExpiry;
+
+    private Instant otpExpiry;
 
     @Column(name = "avatar_url")
     @Schema(description = "Link ảnh đại diện")
@@ -40,29 +47,25 @@ public class User {
     // ==========================================
 
     @Column(name = "totp_secret")
-    @Schema(description = "Khóa bí mật cho Google Authenticator (TOTP)")
+    @JsonIgnore // Bảo mật: Khóa 2FA phải giấu kín, FE chỉ nhận lúc setup qua QR
     private String totpSecret;
 
     @Column(name = "is_2fa_enabled", nullable = false)
-    @Schema(description = "Trạng thái bật/tắt bảo mật 2 lớp", example = "false")
-    private boolean is2faEnabled = false; // Mặc định tạo tài khoản là tắt 2FA
+    private boolean is2faEnabled = false;
 
     @Column(name = "last_login_ip")
-    @Schema(description = "IP của lần đăng nhập gần nhất để cảnh báo bảo mật", example = "192.168.1.1")
     private String lastLoginIp;
-
 
     // ==========================================
     // KHU VỰC PHÂN QUYỀN (ROLE)
     // ==========================================
 
     @Enumerated(EnumType.STRING)
-    @Schema(description = "Quyền hạn của tài khoản", example = "USER")
-    private Role role = Role.USER; // Mặc định đăng ký là Thường dân
+    @Column(length = 20)
+    private Role role = Role.USER;
 
-    // Khai báo các loại thẻ (Quyền) ngay trong này
     public enum Role {
-        USER,  // Thẻ Thường
-        ADMIN  // Thẻ VIP
+        USER,
+        ADMIN
     }
 }

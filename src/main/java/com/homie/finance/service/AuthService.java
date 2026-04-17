@@ -49,6 +49,8 @@ public class AuthService {
             AuthResponse response = new AuthResponse();
             response.set2faRequired(true);
             response.setTempToken(tempToken);
+            response.setAccessToken(null);
+            response.setRefreshToken(null);
             return response;
         }
 
@@ -364,7 +366,8 @@ public class AuthService {
                     .username(user.getUsername())
                     .email(user.getEmail())
                     .role(user.getRole().name())
-                    .avatarUrl(user.getAvatarUrl()) // Trả về cho FE
+                    .avatarUrl(user.getAvatarUrl())
+                    .is2faEnabled(user.is2faEnabled())
                     .build();
         } catch (Exception e) {
             throw new RuntimeException("Lỗi khi upload ảnh: " + e.getMessage());
