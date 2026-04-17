@@ -50,7 +50,7 @@ public class User {
     @JsonIgnore // Bảo mật: Khóa 2FA phải giấu kín, FE chỉ nhận lúc setup qua QR
     private String totpSecret;
 
-    @Column(name = "is_2fa_enabled", nullable = false)
+    @Column(name = "is_2fa_enabled", nullable = false, columnDefinition = "boolean default false")
     private boolean is2faEnabled = false;
 
     @Column(name = "last_login_ip")

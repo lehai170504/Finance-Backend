@@ -25,5 +25,6 @@ public class Category {
 
     @NotBlank(message = "Chọn một cái icon cho chất nhé homie!")
     @Schema(description = "Tên định danh của Icon", example = "ic_fastfood")
+    @Column(nullable = false, columnDefinition = "varchar(255) default 'category'")
     private String icon;
 }

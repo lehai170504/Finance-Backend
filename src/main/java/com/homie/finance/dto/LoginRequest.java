@@ -7,11 +7,11 @@ import lombok.Data;
 @Data
 public class LoginRequest {
 
-    @NotBlank(message = "Chưa nhập username")
-    @Schema(description = "Tên đăng nhập", example = "homiedev")
-    private String username;
+    @NotBlank(message = "Chua nhap email hoac username")
+    @Schema(description = "Dinh danh dang nhap: email hoac ten dang nhap", example = "homiedev")
+    private String loginId;
 
-    @NotBlank(message = "Chưa nhập password")
-    @Schema(description = "Mật khẩu", example = "123456")
+    @NotBlank(message = "Chua nhap password")
+    @Schema(description = "Mat khau", example = "123456")
     private String password;
 }

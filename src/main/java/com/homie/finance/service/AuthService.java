@@ -4,7 +4,12 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
-import com.homie.finance.dto.*;
+import com.homie.finance.dto.AuthResponse;
+import com.homie.finance.dto.GoogleLoginRequest;
+import com.homie.finance.dto.LoginRequest;
+import com.homie.finance.dto.RegisterRequest;
+import com.homie.finance.dto.UserResponse;
+import com.homie.finance.dto.Verify2FaRequest;
 import com.homie.finance.entity.BlacklistedToken;
 import com.homie.finance.entity.RefreshToken;
 import com.homie.finance.entity.User;
@@ -20,7 +25,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -40,11 +48,24 @@ public class AuthService {
     @Value("${google.client-id}")
     private String googleClientId;
 
-    // ==============================================================
-    // HÀM DÙNG CHUNG (Xử lý trả về Token thật hoặc Token tạm cho 2FA)
-    // ==============================================================
+    private User getCurrentAuthenticatedUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung!"));
+    }
+
+    private User findUserForLogin(String loginId) {
+        return userRepository.findByEmail(loginId)
+                .or(() -> userRepository.findByUsername(loginId))
+                .orElseThrow(() -> new IllegalArgumentException("Email/username hoac mat khau khong chinh xac!"));
+    }
+
     private AuthResponse processUserLogin(User user) {
         if (user.is2faEnabled()) {
+            if (!StringUtils.hasText(user.getTotpSecret())) {
+                throw new IllegalStateException("Tai khoan dang bat 2FA nhung secret khong hop le. Hay thiet lap lai 2FA.");
+            }
+
             String tempToken = jwtUtil.generateTempToken(user.getId());
             AuthResponse response = new AuthResponse();
             response.set2faRequired(true);
@@ -59,16 +80,13 @@ public class AuthService {
         return new AuthResponse(accessToken, refreshToken.getToken(), "Bearer", user.getUsername());
     }
 
-    // ==============================================================
-    // 1. ĐĂNG KÝ
-    // ==============================================================
     @Transactional
     public String register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalArgumentException("Tên đăng nhập đã tồn tại!");
+            throw new IllegalArgumentException("Ten dang nhap da ton tai!");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email này đã được sử dụng!");
+            throw new IllegalArgumentException("Email nay da duoc su dung!");
         }
 
         User user = new User();
@@ -78,40 +96,35 @@ public class AuthService {
         userRepository.save(user);
 
         emailService.sendWelcomeEmail(user.getEmail(), user.getUsername());
-        return "Đăng ký thành công!";
+        return "Dang ky thanh cong!";
     }
 
-    // ==============================================================
-    // 2. ĐĂNG NHẬP BẰNG EMAIL (Tích hợp Cảnh báo IP lạ & 2FA)
-    // ==============================================================
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
-        User user = userRepository.findByEmail(request.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("Email hoặc mật khẩu không chính xác!"));
+        User user = findUserForLogin(request.getLoginId());
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("Email hoặc mật khẩu không chính xác!");
+            throw new IllegalArgumentException("Email/username hoac mat khau khong chinh xac!");
         }
 
         String currentIp = getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
         checkAndAlertUnrecognizedDevice(user, currentIp, userAgent);
 
-        // Gọi hàm dùng chung
         return processUserLogin(user);
     }
 
-    // ==============================================================
-    // 3. ĐĂNG NHẬP GOOGLE (Tích hợp Cảnh báo IP lạ & 2FA)
-    // ==============================================================
     @Transactional
     public AuthResponse loginWithGoogle(GoogleLoginRequest request, HttpServletRequest httpRequest) {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
-                    .setAudience(Collections.singletonList(googleClientId)).build();
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
 
             GoogleIdToken idToken = verifier.verify(request.getIdToken());
-            if (idToken == null) throw new IllegalArgumentException("Xác thực Google thất bại!");
+            if (idToken == null) {
+                throw new IllegalArgumentException("Xac thuc Google that bai!");
+            }
 
             String email = idToken.getPayload().getEmail();
             User user = userRepository.findByEmail(email).orElse(null);
@@ -128,22 +141,18 @@ public class AuthService {
             String userAgent = httpRequest.getHeader("User-Agent");
             checkAndAlertUnrecognizedDevice(user, currentIp, userAgent);
 
-            // Gọi hàm dùng chung
             return processUserLogin(user);
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi Google Auth: " + e.getMessage());
+            throw new RuntimeException("Loi Google Auth: " + e.getMessage());
         }
     }
 
-    // ==============================================================
-    // CÁC HÀM XỬ LÝ BẢO MẬT & THIẾT BỊ
-    // ==============================================================
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+        if (!StringUtils.hasText(ip) || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getHeader("Proxy-Client-IP");
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+        if (!StringUtils.hasText(ip) || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getRemoteAddr();
         }
 
@@ -153,15 +162,9 @@ public class AuthService {
     @Async
     public void checkAndAlertUnrecognizedDevice(User user, String currentIp, String userAgent) {
         if (user.getLastLoginIp() != null && !currentIp.equals(user.getLastLoginIp())) {
-
-            String subject = "Cảnh báo đăng nhập từ thiết bị lạ";
+            String subject = "Canh bao dang nhap tu thiet bi la";
             String content = String.format(
-                    "Chào %s,\n\n" +
-                            "Tài khoản Homie Finance của bạn vừa được đăng nhập từ một thiết bị hoặc vị trí mới.\n\n" +
-                            " Địa chỉ IP: %s\n" +
-                            " Thiết bị/Trình duyệt: %s\n\n" +
-                            "Nếu đây không phải là bạn, hãy đăng nhập và đổi mật khẩu ngay lập tức để bảo vệ tài sản của mình.\n\n" +
-                            "Trân trọng,\nĐội ngũ Bảo mật Homie Finance.",
+                    "Chao %s,\n\nTai khoan Homie Finance cua ban vua duoc dang nhap tu mot thiet bi hoac vi tri moi.\n\nIP: %s\nThiet bi/Trinh duyet: %s\n\nNeu day khong phai ban, hay dang nhap va doi mat khau ngay lap tuc.\n\nTran trong,\nDoi ngu Bao mat Homie Finance.",
                     user.getUsername(), currentIp, userAgent
             );
 
@@ -172,40 +175,48 @@ public class AuthService {
         userRepository.save(user);
     }
 
-    // ==============================================================
-    // CÀI ĐẶT 2FA (BẬT/TẮT BẢO MẬT 2 LỚP)
-    // ==============================================================
     @Transactional
     public String setup2FA() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+        User user = getCurrentAuthenticatedUser();
+
+        if (user.is2faEnabled()) {
+            throw new IllegalArgumentException("Tai khoan nay da bat 2FA. Hay tat 2FA truoc khi thiet lap lai.");
+        }
 
         return twoFactorAuthService.generateSecretKey(user);
     }
 
     @Transactional
     public void confirmAndEnable2FA(int code) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+        User user = getCurrentAuthenticatedUser();
+
+        if (!StringUtils.hasText(user.getTotpSecret())) {
+            throw new IllegalArgumentException("Ban chua thiet lap secret 2FA. Hay goi /api/auth/2fa/setup truoc.");
+        }
+
+        if (user.is2faEnabled()) {
+            throw new IllegalArgumentException("Tai khoan nay da bat 2FA roi.");
+        }
 
         if (twoFactorAuthService.verifyCode(user.getTotpSecret(), code)) {
             user.set2faEnabled(true);
             userRepository.save(user);
-        } else {
-            throw new IllegalArgumentException("Mã xác nhận không đúng, vui lòng thử lại!");
+            return;
         }
+
+        throw new IllegalArgumentException("Ma xac nhan khong dung, vui long thu lai!");
     }
 
     @Transactional
     public void disable2FA(String password) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+        User user = getCurrentAuthenticatedUser();
+
+        if (!user.is2faEnabled()) {
+            throw new IllegalArgumentException("Tai khoan nay chua bat 2FA.");
+        }
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new IllegalArgumentException("Mật khẩu không chính xác!");
+            throw new IllegalArgumentException("Mat khau khong chinh xac!");
         }
 
         user.set2faEnabled(false);
@@ -213,13 +224,8 @@ public class AuthService {
         userRepository.save(user);
     }
 
-    // ==============================================================
-    // THÔNG TIN USER & QUÊN MẬT KHẨU
-    // ==============================================================
     public UserResponse getMyInfo() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User không tồn tại!"));
+        User user = getCurrentAuthenticatedUser();
 
         return UserResponse.builder()
                 .id(user.getId())
@@ -234,35 +240,36 @@ public class AuthService {
     @Transactional
     public void forgotPassword(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Email này chưa đăng ký homie ơi!"));
+                .orElseThrow(() -> new IllegalArgumentException("Email nay chua dang ky!"));
 
         if (user.getOtpExpiry() != null) {
-            long secondsSinceLastSend = java.time.Duration.between(
+            long secondsSinceLastSend = Duration.between(
                     user.getOtpExpiry().minusSeconds(300),
-                    java.time.Instant.now()
+                    Instant.now()
             ).getSeconds();
 
             if (secondsSinceLastSend < 60) {
-                throw new IllegalArgumentException("Vui lòng đợi " + (60 - secondsSinceLastSend) + "s để yêu cầu mã mới!");
+                throw new IllegalArgumentException("Vui long doi " + (60 - secondsSinceLastSend) + "s de yeu cau ma moi!");
             }
         }
 
         String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
         user.setOtp(otp);
-        user.setOtpExpiry(java.time.Instant.now().plusSeconds(300));
+        user.setOtpExpiry(Instant.now().plusSeconds(300));
         userRepository.save(user);
 
-        emailService.sendSimpleEmail(email, "Mã OTP của bạn là: " + otp, "Mã xác thực đổi mật khẩu");
+        emailService.sendSimpleEmail(email, "Ma OTP cua ban la: " + otp, "Ma xac thuc doi mat khau");
     }
 
     @Transactional
     public void resetPassword(String email, String otp, String newPassword) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Email không tồn tại!"));
+                .orElseThrow(() -> new IllegalArgumentException("Email khong ton tai!"));
 
         if (user.getOtp() == null || !user.getOtp().equals(otp)
-                || user.getOtpExpiry().isBefore(java.time.Instant.now())) {
-            throw new IllegalArgumentException("Mã OTP sai hoặc đã hết hạn rồi!");
+                || user.getOtpExpiry() == null
+                || user.getOtpExpiry().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Ma OTP sai hoac da het han roi!");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -277,12 +284,16 @@ public class AuthService {
         User user = userRepository.findByUsername(currentUsername).orElseThrow();
 
         if (userRepository.existsByUsername(newUsername)) {
-            throw new IllegalArgumentException("Username này đã có người dùng rồi!");
+            throw new IllegalArgumentException("Username nay da co nguoi dung roi!");
         }
 
         user.setUsername(newUsername);
         userRepository.save(user);
-        return UserResponse.builder().id(user.getId()).username(user.getUsername()).email(user.getEmail()).build();
+        return UserResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .build();
     }
 
     @Transactional
@@ -291,7 +302,7 @@ public class AuthService {
         User user = userRepository.findByUsername(currentUsername).orElseThrow();
 
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-            throw new IllegalArgumentException("Mật khẩu cũ không chính xác!");
+            throw new IllegalArgumentException("Mat khau cu khong chinh xac!");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -301,7 +312,7 @@ public class AuthService {
     @Transactional
     public void logout(String token) {
         if (token == null || !token.startsWith("Bearer ")) {
-            throw new IllegalArgumentException("Token không hợp lệ!");
+            throw new IllegalArgumentException("Token khong hop le!");
         }
         String jwt = token.substring(7);
 
@@ -312,22 +323,29 @@ public class AuthService {
 
         String username = jwtUtil.extractUsername(jwt);
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+                .orElseThrow(() -> new RuntimeException("Khong tim thay nguoi dung!"));
 
         refreshTokenService.deleteByUserId(user.getId());
     }
 
     @Transactional
     public AuthResponse verify2FA(Verify2FaRequest req) {
-        String userId = jwtUtil.getUserIdFromTempToken(req.getTempToken());
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Token tạm không hợp lệ hoặc đã hết hạn!"));
-
-        if (!twoFactorAuthService.verifyCode(user.getTotpSecret(), req.getCode())) {
-            throw new IllegalArgumentException("Mã 2FA không chính xác!");
+        if (!StringUtils.hasText(req.getTempToken())) {
+            throw new IllegalArgumentException("Thieu tempToken de xac thuc 2FA.");
         }
 
-        // Nếu đúng mã -> Sinh thẻ thật
+        String userId = jwtUtil.getUserIdFromTempToken(req.getTempToken());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Token tam khong hop le hoac da het han!"));
+
+        if (!user.is2faEnabled() || !StringUtils.hasText(user.getTotpSecret())) {
+            throw new IllegalArgumentException("Tai khoan nay chua duoc cau hinh 2FA hop le.");
+        }
+
+        if (!twoFactorAuthService.verifyCode(user.getTotpSecret(), req.getCode())) {
+            throw new IllegalArgumentException("Ma 2FA khong chinh xac!");
+        }
+
         String accessToken = jwtUtil.generateToken(user.getUsername());
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getUsername());
         return new AuthResponse(accessToken, refreshToken.getToken(), "Bearer", user.getUsername());
@@ -342,25 +360,18 @@ public class AuthService {
                     String newAccessToken = jwtUtil.generateToken(user.getUsername());
                     return new AuthResponse(newAccessToken, requestToken, "Bearer", user.getUsername());
                 })
-                .orElseThrow(() -> new RuntimeException("Refresh Token không hợp lệ hoặc đã hết hạn!"));
+                .orElseThrow(() -> new RuntimeException("Refresh Token khong hop le hoac da het han!"));
     }
 
     @Transactional
     public UserResponse uploadAvatar(org.springframework.web.multipart.MultipartFile file) {
         try {
-            // Lấy user đang đăng nhập
-            String username = SecurityContextHolder.getContext().getAuthentication().getName();
-            User user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+            User user = getCurrentAuthenticatedUser();
 
-            // Upload ảnh lên Cloudinary
             String imageUrl = cloudinaryService.uploadImage(file);
-
-            // Lưu link vào DB
             user.setAvatarUrl(imageUrl);
             userRepository.save(user);
 
-            // Trả về thông tin mới (Nhớ map cái avatarUrl vào nhé)
             return UserResponse.builder()
                     .id(user.getId())
                     .username(user.getUsername())
@@ -370,7 +381,7 @@ public class AuthService {
                     .is2faEnabled(user.is2faEnabled())
                     .build();
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi khi upload ảnh: " + e.getMessage());
+            throw new RuntimeException("Loi khi upload anh: " + e.getMessage());
         }
     }
 }

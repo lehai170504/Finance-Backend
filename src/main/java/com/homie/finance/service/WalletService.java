@@ -5,10 +5,10 @@ import com.homie.finance.entity.User;
 import com.homie.finance.entity.Wallet;
 import com.homie.finance.repository.UserRepository;
 import com.homie.finance.repository.WalletRepository;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -19,14 +19,18 @@ public class WalletService {
     @Autowired
     private UserRepository userRepository;
 
-    // Lấy User từ Token
     private User getCurrentLoggedInUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Lỗi xác thực người dùng!"));
+                .orElseThrow(() -> new RuntimeException("Loi xac thuc nguoi dung!"));
     }
 
-    // 1. TẠO VÍ
+    private void validatePositiveAmount(Double amount, String message) {
+        if (amount == null || amount <= 0) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
     @Transactional
     public Wallet createWallet(WalletRequest request) {
         User currentUser = getCurrentLoggedInUser();
@@ -38,29 +42,34 @@ public class WalletService {
         return walletRepository.save(newWallet);
     }
 
-    // 2. LẤY DANH SÁCH VÍ
     @Transactional(readOnly = true)
     public List<Wallet> getMyWallets() {
         return walletRepository.findByUser(getCurrentLoggedInUser());
     }
 
-    // 3. CHUYỂN TIỀN
     @Transactional
     public void transferMoney(String fromId, String toId, Double amount) {
         User currentUser = getCurrentLoggedInUser();
+
+        validatePositiveAmount(amount, "So tien chuyen phai lon hon 0!");
+        if (fromId.equals(toId)) {
+            throw new IllegalArgumentException("Khong the chuyen tien trong cung mot vi!");
+        }
+
         if (!walletRepository.existsByIdAndUser(fromId, currentUser)) {
-            throw new IllegalArgumentException("Ví nguồn không tồn tại hoặc không thuộc về homie!");
+            throw new IllegalArgumentException("Vi nguon khong ton tai hoac khong thuoc ve ban!");
         }
 
         if (!walletRepository.existsByIdAndUser(toId, currentUser)) {
-            throw new IllegalArgumentException("Ví đích không thuộc về homie!");
+            throw new IllegalArgumentException("Vi dich khong thuoc ve ban!");
         }
 
         Wallet fromWallet = walletRepository.findById(fromId).orElseThrow();
-        Wallet toWallet = walletRepository.findById(toId).orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ví đích"));
+        Wallet toWallet = walletRepository.findById(toId)
+                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay vi dich"));
 
         if (fromWallet.getBalance() < amount) {
-            throw new IllegalArgumentException("Số dư ví nguồn không đủ!");
+            throw new IllegalArgumentException("So du vi nguon khong du!");
         }
 
         fromWallet.setBalance(fromWallet.getBalance() - amount);
@@ -70,45 +79,42 @@ public class WalletService {
         walletRepository.save(toWallet);
     }
 
-    // 4. TÍNH TỔNG SỐ DƯ
     public Double getTotalBalance() {
         Double total = walletRepository.sumBalanceByUser(getCurrentLoggedInUser());
         return total != null ? total : 0.0;
     }
 
-    // 5. CẬP NHẬT VÍ
     @Transactional
     public Wallet updateWallet(String id, WalletRequest request) {
         User currentUser = getCurrentLoggedInUser();
 
-        // 💡 CÁCH 2: Check quyền trước khi load nặng
         if (!walletRepository.existsByIdAndUser(id, currentUser)) {
-            throw new RuntimeException("Ví không tồn tại hoặc homie không có quyền sửa!");
+            throw new RuntimeException("Vi khong ton tai hoac ban khong co quyen sua!");
         }
 
         Wallet wallet = walletRepository.findById(id).orElseThrow();
         wallet.setName(request.getName());
         wallet.setColor(request.getColor());
-        if (request.getBalance() != null) wallet.setBalance(request.getBalance());
+
+        if (request.getBalance() != null && !request.getBalance().equals(wallet.getBalance())) {
+            throw new IllegalArgumentException("Khong duoc sua truc tiep so du vi. Hay tao giao dich hoac chuyen tien.");
+        }
 
         return walletRepository.save(wallet);
     }
 
-    // 6. XÓA VÍ
     @Transactional
     public void deleteWallet(String id) {
         User currentUser = getCurrentLoggedInUser();
 
-        // 💡 CÁCH 2: Check quyền xóa
         if (!walletRepository.existsByIdAndUser(id, currentUser)) {
-            throw new RuntimeException("Ví không tồn tại hoặc homie không có quyền xóa!");
+            throw new RuntimeException("Vi khong ton tai hoac ban khong co quyen xoa!");
         }
 
         Wallet wallet = walletRepository.findById(id).orElseThrow();
 
-        // Kiểm tra số dư phải bằng 0 mới được xóa
         if (wallet.getBalance() != null && wallet.getBalance() > 0) {
-            throw new IllegalArgumentException("Ví vẫn còn tiền (" + wallet.getBalance() + "). Phải tẩu tán hết tiền mới được xóa ví nha!");
+            throw new IllegalArgumentException("Vi van con tien (" + wallet.getBalance() + "). Phai chuyen het tien truoc khi xoa.");
         }
 
         walletRepository.delete(wallet);
