@@ -7,6 +7,8 @@ import com.homie.finance.repository.UserRepository;
 import com.homie.finance.repository.WalletRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +38,7 @@ public class WalletService {
     }
 
     @Transactional
+    @CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public Wallet createWallet(WalletRequest request) {
         User currentUser = getCurrentLoggedInUser();
         Wallet newWallet = new Wallet();
@@ -47,11 +50,13 @@ public class WalletService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public List<Wallet> getMyWallets() {
         return walletRepository.findByUser(getCurrentLoggedInUser());
     }
 
     @Transactional
+    @CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public void transferMoney(String fromId, String toId, Double amount) {
         User currentUser = getCurrentLoggedInUser();
 
@@ -83,7 +88,8 @@ public class WalletService {
         walletRepository.save(toWallet);
 
         // Record transactions for transfer
-        com.homie.finance.entity.Category transferOutCategory = categoryRepository.findByNameIgnoreCase("Chuyển tiền đi")
+        com.homie.finance.entity.Category transferOutCategory = categoryRepository
+                .findByNameIgnoreCase("Chuyển tiền đi")
                 .orElseGet(() -> {
                     com.homie.finance.entity.Category c = new com.homie.finance.entity.Category();
                     c.setName("Chuyển tiền đi");
@@ -130,6 +136,7 @@ public class WalletService {
     }
 
     @Transactional
+    @CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public Wallet updateWallet(String id, WalletRequest request) {
         User currentUser = getCurrentLoggedInUser();
 
@@ -142,13 +149,15 @@ public class WalletService {
         wallet.setColor(request.getColor());
 
         if (request.getBalance() != null && !request.getBalance().equals(wallet.getBalance())) {
-            throw new IllegalArgumentException("Khong duoc sua truc tiep so du vi. Hay tao giao dich hoac chuyen tien.");
+            throw new IllegalArgumentException(
+                    "Khong duoc sua truc tiep so du vi. Hay tao giao dich hoac chuyen tien.");
         }
 
         return walletRepository.save(wallet);
     }
 
     @Transactional
+    @CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public void deleteWallet(String id) {
         User currentUser = getCurrentLoggedInUser();
 
@@ -156,16 +165,14 @@ public class WalletService {
             throw new RuntimeException("Vi khong ton tai hoac ban khong co quyen xoa!");
         }
 
-        if (transactionRepository.existsByWalletId(id)) {
-            throw new IllegalArgumentException("Vi nay da co lich su giao dich, khong the xoa!");
-        }
-
         Wallet wallet = walletRepository.findById(id).orElseThrow();
 
         if (wallet.getBalance() != null && wallet.getBalance() > 0) {
-            throw new IllegalArgumentException("Vi van con tien (" + wallet.getBalance() + "). Phai chuyen het tien truoc khi xoa.");
+            throw new IllegalArgumentException(
+                    "Vi van con tien (" + wallet.getBalance() + "). Phai chuyen het tien truoc khi xoa.");
         }
 
-        walletRepository.delete(wallet);
+        wallet.setDeleted(true);
+        walletRepository.save(wallet);
     }
 }

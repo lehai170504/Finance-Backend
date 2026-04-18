@@ -13,11 +13,11 @@ import java.util.Map;
 @RestControllerAdvice // Đánh dấu đây là Trạm kiểm soát lỗi toàn hệ thống
 public class GlobalExceptionHandler {
 
-    // 1. BẮT CÁC LỖI LOGIC DO MÌNH CHỦ ĐỘNG NÉM RA (IllegalArgumentException, RuntimeException)
-    @ExceptionHandler({IllegalArgumentException.class, RuntimeException.class})
-    @ResponseStatus(HttpStatus.BAD_REQUEST) // Trả về mã lỗi 400
+    // 1. BẮT CÁC LỖI LOGIC DO MÌNH CHỦ ĐỘNG NÉM RA (IllegalArgumentException,
+    // IllegalStateException)
+    @ExceptionHandler({ IllegalArgumentException.class, IllegalStateException.class })
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Object> handleLogicError(Exception ex) {
-        // Gói câu thông báo lỗi vào cái khuôn ApiResponse quen thuộc
         return new ApiResponse<>(400, ex.getMessage(), null);
     }
 
@@ -27,9 +27,8 @@ public class GlobalExceptionHandler {
     public ApiResponse<Object> handleValidationError(MethodArgumentNotValidException ex) {
         // Gom tất cả các lỗi nhập liệu (VD: để trống mật khẩu, sai định dạng email) lại
         Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(error ->
-                errors.put(error.getField(), error.getDefaultMessage())
-        );
+        ex.getBindingResult().getFieldErrors()
+                .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
 
         return new ApiResponse<>(400, "Dữ liệu nhập vào chưa chuẩn xác!", errors);
     }

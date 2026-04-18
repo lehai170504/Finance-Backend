@@ -75,6 +75,7 @@ public class TransactionService {
     }
 
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public TransactionResponse createTransaction(String walletId, String categoryId, String groupId,
             TransactionRequest request) {
         User currentUser = securityUtils.getCurrentUser();
@@ -169,6 +170,7 @@ public class TransactionService {
     }
 
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public TransactionResponse updateTransaction(String id, String newWalletId, String newCategoryId,
             TransactionRequest request) {
         User currentUser = securityUtils.getCurrentUser();
@@ -226,6 +228,7 @@ public class TransactionService {
     }
 
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public void deleteTransaction(String id) {
         User currentUser = securityUtils.getCurrentUser();
         Transaction transaction = transactionRepository.findById(id).orElseThrow();
@@ -265,6 +268,7 @@ public class TransactionService {
     }
 
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public TransactionResponse restoreTransaction(String id) {
         User currentUser = securityUtils.getCurrentUser();
         Transaction transaction = transactionRepository.findById(id).orElseThrow();
@@ -399,6 +403,16 @@ public class TransactionService {
             endDate = currentMonth.atEndOfMonth();
         }
         return transactionRepository.getCategoryStatistics(currentUser, startDate, endDate);
+    }
+
+    public List<com.homie.finance.dto.CashFlowResponse> getCashFlowStatistics(LocalDate startDate, LocalDate endDate) {
+        User currentUser = securityUtils.getCurrentUser();
+        if (startDate == null || endDate == null) {
+            YearMonth currentMonth = YearMonth.now();
+            startDate = currentMonth.atDay(1);
+            endDate = currentMonth.atEndOfMonth();
+        }
+        return transactionRepository.getCashFlowStatistics(currentUser, startDate, endDate);
     }
 
     private void checkBudgetAndAlert(User currentUser, Category category, TransactionRequest request) {

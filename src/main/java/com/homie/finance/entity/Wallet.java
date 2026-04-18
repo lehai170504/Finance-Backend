@@ -3,10 +3,13 @@ package com.homie.finance.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Entity
 @Table(name = "wallets")
 @Data
-public class Wallet {
+@org.hibernate.annotations.SQLRestriction("is_deleted = false")
+public class Wallet implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
@@ -21,4 +24,6 @@ public class Wallet {
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user; // Ví này thuộc về ai
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
+    private boolean isDeleted = false;
 }

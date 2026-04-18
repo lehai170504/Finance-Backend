@@ -43,14 +43,14 @@ public class TransactionCronJob {
                         template.getWallet().getId(),
                         template.getCategory().getId(),
                         template.getUser(),
-                        request
-                );
+                        request);
 
                 // 4. Tính toán ngày trừ tiền cho lần kế tiếp
-                if ("MONTHLY".equals(template.getFrequency())) {
-                    template.setNextExecutionDate(today.plusMonths(1));
-                } else if ("WEEKLY".equals(template.getFrequency())) {
+                if ("WEEKLY".equals(template.getFrequency())) {
                     template.setNextExecutionDate(today.plusWeeks(1));
+                } else {
+                    // Mặc định MONTHLY nếu null hoặc không xác định
+                    template.setNextExecutionDate(today.plusMonths(1));
                 }
 
                 recurringRepository.save(template);

@@ -36,8 +36,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "https://finance-website-pi.vercel.app",
-                "http://localhost:3000"
-        ));
+                "http://localhost:3000"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept"));
         configuration.setExposedHeaders(List.of("Authorization"));
@@ -55,7 +54,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/2fa/setup", "/api/auth/2fa/confirm", "/api/auth/2fa/disable").authenticated()
+                        .requestMatchers("/api/auth/2fa/setup", "/api/auth/2fa/confirm", "/api/auth/2fa/disable")
+                        .authenticated()
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/swagger-ui/**",
@@ -63,11 +63,10 @@ public class SecurityConfig {
                                 "/v3/api-docs",
                                 "/v3/api-docs/**",
                                 "/swagger-resources/**",
-                                "/webjars/**"
-                        ).permitAll()
+                                "/webjars/**")
+                        .permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -75,7 +74,8 @@ public class SecurityConfig {
 
     @Bean
     public org.springframework.security.authentication.AuthenticationManager authenticationManager(
-            org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration authenticationConfiguration) throws Exception {
+            org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration authenticationConfiguration)
+            throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 }

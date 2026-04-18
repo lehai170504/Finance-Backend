@@ -5,10 +5,13 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Entity
 @Table(name = "categories")
 @Data
-public class Category {
+@org.hibernate.annotations.SQLRestriction("is_deleted = false")
+public class Category implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -27,4 +30,7 @@ public class Category {
     @Schema(description = "Tên định danh của Icon", example = "ic_fastfood")
     @Column(nullable = false, columnDefinition = "varchar(255) default 'category'")
     private String icon;
+
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
+    private boolean isDeleted = false;
 }

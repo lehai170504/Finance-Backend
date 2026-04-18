@@ -11,7 +11,8 @@ import java.util.List;
 public interface TransactionLogRepository extends JpaRepository<TransactionLog, String> {
     List<TransactionLog> findByTransactionIdOrderByUpdatedAtDesc(String transactionId);
 
-    @Query("SELECT l FROM TransactionLog l JOIN Transaction t ON l.transactionId = t.id " +
-            "WHERE t.groupSpace.id = :groupId ORDER BY l.updatedAt DESC")
+    @Query("SELECT l FROM TransactionLog l WHERE l.transactionId IN " +
+            "(SELECT t.id FROM Transaction t WHERE t.groupSpace.id = :groupId) " +
+            "ORDER BY l.updatedAt DESC")
     List<TransactionLog> findAllLogsByGroupId(@Param("groupId") String groupId);
 }

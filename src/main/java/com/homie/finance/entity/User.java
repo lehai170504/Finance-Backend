@@ -11,7 +11,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "users")
 @Data
-public class User {
+public class User implements java.io.Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
