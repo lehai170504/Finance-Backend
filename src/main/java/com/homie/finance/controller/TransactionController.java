@@ -1,9 +1,7 @@
 package com.homie.finance.controller;
 
 import com.homie.finance.dto.*;
-import com.homie.finance.entity.Transaction;
-import com.homie.finance.entity.TransactionLog;
-import com.homie.finance.service.LogService;
+
 import com.homie.finance.service.OcrService;
 import com.homie.finance.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -73,19 +71,13 @@ public class TransactionController {
     // --- NHÓM 3: THÊM / SỬA / XÓA ---
 
     @PostMapping("/create")
-    @Operation(
-            summary = "Thêm giao dịch mới",
-            description = "Ghi chép một khoản thu/chi. Hệ thống tự cập nhật số dư Ví và gắn vào Nhóm (nếu có)."
-    )
+    @Operation(summary = "Thêm giao dịch mới", description = "Ghi chép một khoản thu/chi. Hệ thống tự cập nhật số dư Ví và gắn vào Nhóm (nếu có).")
     public ApiResponse<TransactionResponse> createTransaction(
-            @Parameter(description = "ID của Ví (Wallet)")
-            @RequestParam String walletId,
+            @Parameter(description = "ID của Ví (Wallet)") @RequestParam String walletId,
 
-            @Parameter(description = "ID của Danh mục (Category)")
-            @RequestParam String categoryId,
+            @Parameter(description = "ID của Danh mục (Category)") @RequestParam String categoryId,
 
-            @Parameter(description = "ID của Nhóm (Nếu có)")
-            @RequestParam(required = false) String groupId,
+            @Parameter(description = "ID của Nhóm (Nếu có)") @RequestParam(required = false) String groupId,
 
             @Valid @RequestBody TransactionRequest request) {
 

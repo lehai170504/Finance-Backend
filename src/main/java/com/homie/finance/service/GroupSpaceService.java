@@ -23,6 +23,9 @@ public class GroupSpaceService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private com.homie.finance.repository.DebtRepository debtRepository;
+
     // Lấy User hiện tại từ Token
     private User getCurrentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -75,7 +78,8 @@ public class GroupSpaceService {
 
         // Nạp size để Jackson build JSON thành viên không bị lỗi Lazy Initialization
         groups.forEach(g -> {
-            if (g.getMembers() != null) g.getMembers().size();
+            if (g.getMembers() != null)
+                g.getMembers().size();
         });
 
         return groups;
@@ -129,6 +133,12 @@ public class GroupSpaceService {
 
         if (!groupSpaceRepository.existsByIdAndMembersContaining(groupId, me)) {
             throw new IllegalArgumentException("Homie không phải thành viên nhóm này!");
+        }
+
+        if (debtRepository.existsByGroupAndDebtorAndIsSettledFalse(group, me) ||
+                debtRepository.existsByGroupAndCreditorAndIsSettledFalse(group, me)) {
+            throw new IllegalArgumentException(
+                    "Bạn cần thanh toán hoặc được thanh toán hết các khoản nợ trong nhóm trước khi rời đi!");
         }
 
         group.getMembers().remove(me);

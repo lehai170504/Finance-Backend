@@ -18,6 +18,10 @@ public class WalletService {
     private WalletRepository walletRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private com.homie.finance.repository.TransactionRepository transactionRepository;
+    @Autowired
+    private com.homie.finance.repository.CategoryRepository categoryRepository;
 
     private User getCurrentLoggedInUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -77,6 +81,47 @@ public class WalletService {
 
         walletRepository.save(fromWallet);
         walletRepository.save(toWallet);
+
+        // Record transactions for transfer
+        com.homie.finance.entity.Category transferOutCategory = categoryRepository.findByNameIgnoreCase("Chuyển tiền đi")
+                .orElseGet(() -> {
+                    com.homie.finance.entity.Category c = new com.homie.finance.entity.Category();
+                    c.setName("Chuyển tiền đi");
+                    c.setType("EXPENSE");
+                    c.setIcon("swap_horiz");
+                    return categoryRepository.save(c);
+                });
+
+        com.homie.finance.entity.Category transferInCategory = categoryRepository.findByNameIgnoreCase("Nhận tiền về")
+                .orElseGet(() -> {
+                    com.homie.finance.entity.Category c = new com.homie.finance.entity.Category();
+                    c.setName("Nhận tiền về");
+                    c.setType("INCOME");
+                    c.setIcon("swap_horiz");
+                    return categoryRepository.save(c);
+                });
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+
+        com.homie.finance.entity.Transaction txOut = new com.homie.finance.entity.Transaction();
+        txOut.setAmount(amount);
+        txOut.setNote("Chuyển tiền sang ví " + toWallet.getName());
+        txOut.setDate(today);
+        txOut.setCategory(transferOutCategory);
+        txOut.setWallet(fromWallet);
+        txOut.setUser(currentUser);
+        txOut.setDeleted(false);
+        transactionRepository.save(txOut);
+
+        com.homie.finance.entity.Transaction txIn = new com.homie.finance.entity.Transaction();
+        txIn.setAmount(amount);
+        txIn.setNote("Nhận tiền từ ví " + fromWallet.getName());
+        txIn.setDate(today);
+        txIn.setCategory(transferInCategory);
+        txIn.setWallet(toWallet);
+        txIn.setUser(currentUser);
+        txIn.setDeleted(false);
+        transactionRepository.save(txIn);
     }
 
     public Double getTotalBalance() {
@@ -109,6 +154,10 @@ public class WalletService {
 
         if (!walletRepository.existsByIdAndUser(id, currentUser)) {
             throw new RuntimeException("Vi khong ton tai hoac ban khong co quyen xoa!");
+        }
+
+        if (transactionRepository.existsByWalletId(id)) {
+            throw new IllegalArgumentException("Vi nay da co lich su giao dich, khong the xoa!");
         }
 
         Wallet wallet = walletRepository.findById(id).orElseThrow();

@@ -13,6 +13,12 @@ public class CategoryService {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @Autowired
+    private com.homie.finance.repository.TransactionRepository transactionRepository;
+
+    @Autowired
+    private com.homie.finance.repository.BudgetRepository budgetRepository;
+
     // 1. Lấy tất cả danh mục
     public List<Category> getAllCategories() {
         return categoryRepository.findAll();
@@ -43,7 +49,15 @@ public class CategoryService {
         if (!categoryRepository.existsById(id)) {
             throw new IllegalArgumentException("Không tìm thấy danh mục để xóa!");
         }
-        // 💡 Lưu ý: Nếu có Transaction/Budget đang dùng Category này, DB sẽ báo lỗi Constraint
+
+        if (transactionRepository.existsByCategoryId(id)) {
+            throw new IllegalArgumentException("Danh mục này đã có giao dịch, không thể xóa!");
+        }
+
+        if (budgetRepository.existsByCategoryId(id)) {
+            throw new IllegalArgumentException("Danh mục này đang được dùng để cài đặt hạn mức, không thể xóa!");
+        }
+
         categoryRepository.deleteById(id);
     }
 }

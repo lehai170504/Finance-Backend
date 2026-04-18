@@ -18,13 +18,17 @@ public class Debt {
 
     @ManyToOne
     @JoinColumn(name = "debtor_id")
-    private User debtor;   // Người nợ
+    private User debtor; // Người nợ
 
     private Double amount;
 
     @ManyToOne
     @JoinColumn(name = "group_id")
     private GroupSpace group;
+
+    @ManyToOne
+    @JoinColumn(name = "transaction_id")
+    private Transaction transaction;
 
     private boolean isSettled = false; // Đã trả nợ chưa
 }

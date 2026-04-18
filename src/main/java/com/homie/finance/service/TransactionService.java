@@ -16,7 +16,6 @@ import com.homie.finance.repository.BudgetRepository;
 import com.homie.finance.repository.CategoryRepository;
 import com.homie.finance.repository.DebtRepository;
 import com.homie.finance.repository.GroupSpaceRepository;
-import com.homie.finance.repository.TransactionLogRepository;
 import com.homie.finance.repository.TransactionRepository;
 import com.homie.finance.repository.WalletRepository;
 import com.homie.finance.security.SecurityUtils;
@@ -40,24 +39,35 @@ import java.util.stream.Collectors;
 @Service
 public class TransactionService {
 
-    @Autowired private TransactionRepository transactionRepository;
-    @Autowired private CategoryRepository categoryRepository;
-    @Autowired private CloudinaryService cloudinaryService;
-    @Autowired private BudgetRepository budgetRepository;
-    @Autowired private AlertService alertService;
-    @Autowired private GroupSpaceRepository groupSpaceRepository;
-    @Autowired private WalletRepository walletRepository;
-    @Autowired private DebtRepository debtRepository;
-    @Autowired private NotificationService notificationService;
-    @Autowired private TransactionLogRepository transactionLogRepository;
-    @Autowired private LogService logService;
-    @Autowired private SecurityUtils securityUtils;
+    @Autowired
+    private TransactionRepository transactionRepository;
+    @Autowired
+    private CategoryRepository categoryRepository;
+    @Autowired
+    private CloudinaryService cloudinaryService;
+    @Autowired
+    private BudgetRepository budgetRepository;
+    @Autowired
+    private AlertService alertService;
+    @Autowired
+    private GroupSpaceRepository groupSpaceRepository;
+    @Autowired
+    private WalletRepository walletRepository;
+    @Autowired
+    private DebtRepository debtRepository;
+    @Autowired
+    private NotificationService notificationService;
+    @Autowired
+    private LogService logService;
+    @Autowired
+    private SecurityUtils securityUtils;
 
     private GroupSpace requireGroupMembership(String groupId, User currentUser) {
         GroupSpace group = groupSpaceRepository.findByIdWithMembers(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay nhom!"));
 
-        if (group.getMembers() == null || group.getMembers().stream().noneMatch(member -> member.getId().equals(currentUser.getId()))) {
+        if (group.getMembers() == null
+                || group.getMembers().stream().noneMatch(member -> member.getId().equals(currentUser.getId()))) {
             throw new IllegalArgumentException("Ban khong co quyen truy cap nhom nay!");
         }
 
@@ -65,7 +75,8 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponse createTransaction(String walletId, String categoryId, String groupId, TransactionRequest request) {
+    public TransactionResponse createTransaction(String walletId, String categoryId, String groupId,
+            TransactionRequest request) {
         User currentUser = securityUtils.getCurrentUser();
 
         if (categoryId == null || categoryId.isEmpty()) {
@@ -146,6 +157,7 @@ public class TransactionService {
                 debt.setDebtor(member);
                 debt.setAmount(shareAmount);
                 debt.setGroup(group);
+                debt.setTransaction(transaction);
                 debt.setSettled(false);
                 debtRepository.save(debt);
 
@@ -157,7 +169,8 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponse updateTransaction(String id, String newWalletId, String newCategoryId, TransactionRequest request) {
+    public TransactionResponse updateTransaction(String id, String newWalletId, String newCategoryId,
+            TransactionRequest request) {
         User currentUser = securityUtils.getCurrentUser();
         Transaction oldTx = transactionRepository.findById(id).orElseThrow();
         securityUtils.validateTransactionOwner(oldTx, currentUser);
@@ -198,6 +211,17 @@ public class TransactionService {
         oldTx.setCategory(newCategory);
         oldTx.setWallet(newWallet);
 
+        if (oldTx.getGroupSpace() != null) {
+            List<Debt> existingDebts = debtRepository.findByTransaction(oldTx);
+            Set<User> members = oldTx.getGroupSpace().getMembers();
+            double newShare = members.size() > 1 ? Math.floor(request.getAmount() / members.size()) : 0;
+
+            for (Debt debt : existingDebts) {
+                debt.setAmount(newShare);
+                debtRepository.save(debt);
+            }
+        }
+
         return mapToDto(transactionRepository.save(oldTx));
     }
 
@@ -227,6 +251,9 @@ public class TransactionService {
         transaction.setDeletedAt(LocalDateTime.now());
         logService.saveLog(transaction.getId(), currentUser.getUsername(), "DELETE", "Xoa giao dich vao thung rac");
         transactionRepository.save(transaction);
+
+        List<Debt> existingDebts = debtRepository.findByTransaction(transaction);
+        debtRepository.deleteAll(existingDebts);
     }
 
     public List<TransactionResponse> getTrash() {
@@ -260,8 +287,15 @@ public class TransactionService {
 
         transaction.setDeleted(false);
         transaction.setDeletedAt(null);
-        logService.saveLog(transaction.getId(), currentUser.getUsername(), "RESTORE", "Khoi phuc giao dich tu thung rac");
-        return mapToDto(transactionRepository.save(transaction));
+        logService.saveLog(transaction.getId(), currentUser.getUsername(), "RESTORE",
+                "Khoi phuc giao dich tu thung rac");
+        Transaction restoredTx = transactionRepository.save(transaction);
+
+        if (restoredTx.getGroupSpace() != null) {
+            processSplit(restoredTx, restoredTx.getGroupSpace());
+        }
+
+        return mapToDto(restoredTx);
     }
 
     @Transactional
@@ -273,6 +307,10 @@ public class TransactionService {
         if (!transaction.isDeleted()) {
             throw new IllegalArgumentException("Chi duoc xoa vinh vien giao dich dang o trong thung rac!");
         }
+
+        List<Debt> existingDebts = debtRepository.findByTransaction(transaction);
+        debtRepository.deleteAll(existingDebts);
+
         transactionRepository.delete(transaction);
     }
 
@@ -281,7 +319,8 @@ public class TransactionService {
         requireGroupMembership(groupId, currentUser);
 
         List<Transaction> transactions = transactionRepository.findAllByGroupSpaceIdAndIsDeletedFalse(groupId).stream()
-                .filter(t -> t.getDate() != null && t.getDate().getMonthValue() == month && t.getDate().getYear() == year)
+                .filter(t -> t.getDate() != null && t.getDate().getMonthValue() == month
+                        && t.getDate().getYear() == year)
                 .collect(Collectors.toList());
 
         Double totalExpense = transactions.stream()
@@ -291,11 +330,13 @@ public class TransactionService {
 
         Map<String, Double> byCategory = transactions.stream()
                 .filter(t -> t.getCategory() != null && "EXPENSE".equals(t.getCategory().getType()))
-                .collect(Collectors.groupingBy(t -> t.getCategory().getName(), Collectors.summingDouble(Transaction::getAmount)));
+                .collect(Collectors.groupingBy(t -> t.getCategory().getName(),
+                        Collectors.summingDouble(Transaction::getAmount)));
 
         Map<String, Double> byUser = transactions.stream()
                 .filter(t -> t.getUser() != null)
-                .collect(Collectors.groupingBy(t -> t.getUser().getUsername(), Collectors.summingDouble(Transaction::getAmount)));
+                .collect(Collectors.groupingBy(t -> t.getUser().getUsername(),
+                        Collectors.summingDouble(Transaction::getAmount)));
 
         return new GroupStatsResponse(totalExpense, byCategory, byUser);
     }
@@ -309,7 +350,8 @@ public class TransactionService {
     public PageResponse<TransactionResponse> searchTransactions(String keyword, int page, int size) {
         User currentUser = securityUtils.getCurrentUser();
         Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
-        return mapToPageResponse(transactionRepository.findByUserAndNoteContainingIgnoreCaseAndIsDeletedFalse(currentUser, keyword, pageable));
+        return mapToPageResponse(transactionRepository
+                .findByUserAndNoteContainingIgnoreCaseAndIsDeletedFalse(currentUser, keyword, pageable));
     }
 
     public TransactionResponse uploadReceipt(String transactionId, MultipartFile file) {
@@ -368,13 +410,15 @@ public class TransactionService {
                     Double limit = budget.getLimitAmount();
                     LocalDate startDate = YearMonth.of(year, month).atDay(1);
                     LocalDate endDate = YearMonth.of(year, month).atEndOfMonth();
-                    Double spent = transactionRepository.sumAmountByUserAndCategoryAndDateBetween(currentUser, category, startDate, endDate);
+                    Double spent = transactionRepository.sumAmountByUserAndCategoryAndDateBetween(currentUser, category,
+                            startDate, endDate);
                     if (spent == null) {
                         spent = 0.0;
                     }
 
                     if (spent + request.getAmount() > limit) {
-                        alertService.sendBudgetAlertEmail(currentUser.getEmail(), currentUser.getUsername(), category.getName(), limit);
+                        alertService.sendBudgetAlertEmail(currentUser.getEmail(), currentUser.getUsername(),
+                                category.getName(), limit);
                         String msg = "Canh bao: Ban da chi tieu vuot dinh muc cua danh muc " + category.getName()
                                 + " (Han muc: " + String.format("%.0f", limit) + "d)";
                         notificationService.createNotification(currentUser, msg);
@@ -479,8 +523,7 @@ public class TransactionService {
                 "phuc long", "An uong",
                 "grab", "Di chuyen",
                 "be", "Di chuyen",
-                "netflix", "Giai tri"
-        );
+                "netflix", "Giai tri");
 
         String lowerNote = note.toLowerCase().trim();
 
@@ -495,7 +538,8 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponse createSystemTransaction(String walletId, String categoryId, User user, TransactionRequest request) {
+    public TransactionResponse createSystemTransaction(String walletId, String categoryId, User user,
+            TransactionRequest request) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new IllegalArgumentException("Khong tim thay danh muc!"));
 
@@ -528,7 +572,8 @@ public class TransactionService {
                         savedTx.getAmount(), savedTx.getNote(), category.getName()));
 
         if (wallet.getBalance() < 100000) {
-            notificationService.createNotification(user, "Canh bao: Vi '" + wallet.getName() + "' sap can tien sau khi tru phi dinh ky!");
+            notificationService.createNotification(user,
+                    "Canh bao: Vi '" + wallet.getName() + "' sap can tien sau khi tru phi dinh ky!");
         }
 
         if ("EXPENSE".equals(category.getType())) {

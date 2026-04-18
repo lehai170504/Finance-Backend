@@ -94,4 +94,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
             Pageable pageable
     );
 
+    boolean existsByWalletId(String walletId);
+
+    boolean existsByCategoryId(String categoryId);
 }
