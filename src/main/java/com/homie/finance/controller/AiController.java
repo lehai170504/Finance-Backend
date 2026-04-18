@@ -21,4 +21,11 @@ public class AiController {
         String advice = aiService.getFinancialAdvice();
         return ResponseEntity.ok(Map.of("advice", advice));
     }
+
+    @org.springframework.web.bind.annotation.PostMapping("/chat")
+    public ResponseEntity<Map<String, String>> chat(@org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
+        String message = body.get("message");
+        String response = aiService.chatWithAi(message);
+        return ResponseEntity.ok(Map.of("response", response));
+    }
 }

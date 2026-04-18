@@ -132,6 +132,49 @@ public class AiService {
         return sb.toString();
     }
 
+    public String chatWithAi(String userMessage) {
+        User currentUser = securityUtils.getCurrentUser();
+
+        // Lấy ngữ cảnh nhanh
+        YearMonth now = YearMonth.now();
+        List<StatisticResponse> stats = transactionService.getCategoryStatistics(now.atDay(1), now.atEndOfMonth());
+        double totalExpense = stats.stream().filter(s -> "EXPENSE".equals(s.getCategoryType()))
+                .mapToDouble(StatisticResponse::getTotalAmount).sum();
+        double totalIncome = stats.stream().filter(s -> "INCOME".equals(s.getCategoryType()))
+                .mapToDouble(StatisticResponse::getTotalAmount).sum();
+
+        String prompt = String.format(
+                "Bạn là 'Homie Financial AI'. Homie %s vừa hỏi: '%s'.\n" +
+                        "Ngữ cảnh tài chính tháng này:\n" +
+                        "- Thu nhập: %,.0f VNĐ, Chi tiêu: %,.0f VNĐ.\n" +
+                        "Hãy trả lời homie một cách thông minh, ngắn gọn và hữu ích dựa trên câu hỏi và dữ liệu này.",
+                currentUser.getUsername(), userMessage, totalIncome, totalExpense);
+
+        if (aiConfig.getApiKey() != null && !aiConfig.getApiKey().isBlank()) {
+            try {
+                return callGeminiAiRaw(prompt);
+            } catch (Exception e) {
+                return "Xin lỗi homie, tôi đang gặp chút vấn đề về kết nối. Thử lại sau nhé!";
+            }
+        }
+        return "Tính năng chat yêu cầu Gemini API Key. Tuy nhiên dựa trên dữ liệu, tôi thấy bạn đang có số dư là "
+                + (totalIncome - totalExpense) + "đ.";
+    }
+
+    private String callGeminiAiRaw(String prompt) {
+        String url = aiConfig.getApiUrl() + "?key=" + aiConfig.getApiKey();
+        GeminiRequest request = new GeminiRequest(prompt);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<GeminiRequest> entity = new HttpEntity<>(request, headers);
+
+        GeminiResponse response = restTemplate.postForObject(url, entity, GeminiResponse.class);
+        if (response != null && response.getCandidates() != null && !response.getCandidates().isEmpty()) {
+            return response.getCandidates().get(0).getContent().getParts().get(0).getText();
+        }
+        return "AI không phản hồi, thử lại sau nhé!";
+    }
+
     // --- Gemini API DTOs ---
     @Data
     static class GeminiRequest {
