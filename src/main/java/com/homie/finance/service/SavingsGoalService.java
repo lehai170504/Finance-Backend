@@ -25,10 +25,16 @@ public class SavingsGoalService {
     private WalletRepository walletRepository;
 
     @Autowired
+    private com.homie.finance.repository.CategoryRepository categoryRepository;
+
+    @Autowired
     private SecurityUtils securityUtils;
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private TransactionService transactionService;
 
     // 1. Lấy tất cả mục tiêu của tôi (Chưa đạt lên trên, Đã đạt xuống dưới)
     public List<SavingsGoalResponse> getMyGoals() {
@@ -98,11 +104,20 @@ public class SavingsGoalService {
         double newSaved = goal.getSavedAmount() + amount;
         goal.setSavedAmount(newSaved);
 
+        // Ghi log giao dịch hệ thống
+        categoryRepository.findByNameIgnoreCase("Tiết kiệm").ifPresent(cat -> {
+            com.homie.finance.dto.TransactionRequest txReq = new com.homie.finance.dto.TransactionRequest();
+            txReq.setAmount(amount);
+            txReq.setNote("Nạp tiền vào mục tiêu: " + goal.getName());
+            txReq.setDate(java.time.LocalDate.now());
+            transactionService.createSystemTransaction(walletId, cat.getId(), currentUser, txReq);
+        });
+
         // Kiểm tra đạt mục tiêu chưa
         if (newSaved >= goal.getTargetAmount()) {
             goal.setCompleted(true);
             notificationService.createNotification(currentUser,
-                    "🎉 Chúc mừng! Bạn đã đạt mục tiêu tiết kiệm \"" + goal.getName() + "\"! Xứng đáng lắm homie!");
+                    "Chúc mừng! Bạn đã đạt mục tiêu tiết kiệm \"" + goal.getName() + "\"! Xứng đáng lắm homie!");
         }
 
         return mapToDto(savingsGoalRepository.save(goal));
@@ -138,6 +153,15 @@ public class SavingsGoalService {
 
         // Trừ khỏi lợn đất
         goal.setSavedAmount(goal.getSavedAmount() - amount);
+
+        // Ghi log giao dịch hệ thống (Thu nhập từ tiết kiệm)
+        categoryRepository.findByNameIgnoreCase("Tiết kiệm").ifPresent(cat -> {
+            com.homie.finance.dto.TransactionRequest txReq = new com.homie.finance.dto.TransactionRequest();
+            txReq.setAmount(amount);
+            txReq.setNote("Rút tiền từ mục tiêu: " + goal.getName());
+            txReq.setDate(java.time.LocalDate.now());
+            transactionService.createSystemTransaction(walletId, cat.getId(), currentUser, txReq);
+        });
 
         // Nếu đã hoàn thành mà rút tiền ra thì đánh dấu chưa hoàn thành lại
         if (goal.isCompleted() && goal.getSavedAmount() < goal.getTargetAmount()) {

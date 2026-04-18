@@ -17,4 +17,9 @@ public class AppConfig {
                         .version("1.0")
                         .description("Hệ thống quản lý tài chính cá nhân chuẩn Enterprise của Homie"));
     }
+
+    @Bean
+    public org.springframework.web.client.RestTemplate restTemplate() {
+        return new org.springframework.web.client.RestTemplate();
+    }
 }
