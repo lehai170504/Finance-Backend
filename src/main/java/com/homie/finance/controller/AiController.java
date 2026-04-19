@@ -17,20 +17,20 @@ public class AiController {
     @Autowired
     private AiService aiService;
 
-    @GetMapping("/financial-advice")
-    public ResponseEntity<Map<String, String>> getFinancialAdvice() {
+    @GetMapping("/advice")
+    public com.homie.finance.dto.ApiResponse<String> getFinancialAdvice() {
         String advice = aiService.getFinancialAdvice();
-        return ResponseEntity.ok(Map.of("advice", advice));
+        return new com.homie.finance.dto.ApiResponse<>(200, "AI Advice", advice);
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/chat")
-    public ResponseEntity<Map<String, String>> chat(
+    public com.homie.finance.dto.ApiResponse<String> chat(
             @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
         String message = (String) body.get("message");
         @SuppressWarnings("unchecked")
         List<Map<String, String>> history = (List<Map<String, String>>) body.get("history");
 
         String response = aiService.chatWithAi(message, history);
-        return ResponseEntity.ok(Map.of("response", response));
+        return new com.homie.finance.dto.ApiResponse<>(200, "AI Reply", response);
     }
 }
