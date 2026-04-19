@@ -2,7 +2,6 @@ package com.homie.finance.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.homie.finance.dto.OcrResponse;
-import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;

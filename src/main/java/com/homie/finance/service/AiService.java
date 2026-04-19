@@ -43,7 +43,11 @@ public class AiService {
         String contextData = getFinancialContext();
 
         try {
-            String url = aiConfig.getApiUrl() + "/api/ai/advice";
+            String baseUrl = aiConfig.getApiUrl();
+            if (baseUrl.endsWith("/")) {
+                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+            }
+            String url = baseUrl + "/api/ai/advice";
 
             Map<String, Object> request = new HashMap<>();
             request.put("username", currentUser.getUsername());
@@ -69,7 +73,11 @@ public class AiService {
         String contextData = getFinancialContext();
 
         try {
-            String url = aiConfig.getApiUrl() + "/api/ai/chat";
+            String baseUrl = aiConfig.getApiUrl();
+            if (baseUrl.endsWith("/")) {
+                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+            }
+            String url = baseUrl + "/api/ai/chat";
 
             Map<String, Object> request = new HashMap<>();
             request.put("username", currentUser.getUsername());
@@ -90,7 +98,28 @@ public class AiService {
     }
 
     public JsonNode callGeminiAiRaw(String prompt, String base64Image, String mimeType) {
-        return null;
+        try {
+            String baseUrl = aiConfig.getApiUrl();
+            if (baseUrl.endsWith("/")) {
+                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+            }
+            String url = baseUrl + "/api/ai/ocr";
+
+            Map<String, Object> request = new HashMap<>();
+            request.put("image_base64", base64Image);
+            request.put("mime_type", mimeType);
+            request.put("prompt", prompt);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
+
+            return restTemplate.postForObject(url, entity, JsonNode.class);
+
+        } catch (Exception e) {
+            System.err.println("Lỗi gọi OCR Microservice: " + e.getMessage());
+            return null;
+        }
     }
 
     private String getFinancialContext() {
