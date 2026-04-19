@@ -9,7 +9,7 @@ public class AiConfig {
     @Value("${gemini.api.key:}") // Mặc định để trống, homie điền vào application.properties
     private String apiKey;
 
-    @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent}")
+    @Value("${ai.service.url:http://localhost:8000}")
     private String apiUrl;
 
     public String getApiKey() {

@@ -4,9 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.homie.finance.dto.StatisticResponse;
 import com.homie.finance.entity.User;
 import com.homie.finance.security.SecurityUtils;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -15,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.YearMonth;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,72 +36,63 @@ public class AiService {
     private SecurityUtils securityUtils;
 
     /**
-     * Lấy lời khuyên tài chính định kỳ (Dashboard)
+     * Lấy lời khuyên tài chính định kỳ (Dashboard) - Gọi qua Python Microservice
      */
     public String getFinancialAdvice() {
         User currentUser = securityUtils.getCurrentUser();
+        String contextData = getFinancialContext();
 
         try {
-            // 1. Thu thập dữ liệu ngữ cảnh đầy đủ
-            String contextData = getFinancialContext();
+            String url = aiConfig.getApiUrl() + "/api/ai/advice";
 
-            // 2. Kiểm tra API Key để quyết định luồng
-            if (aiConfig.getApiKey() != null && !aiConfig.getApiKey().isBlank()) {
-                String prompt = String.format(
-                        "Bạn là 'Homie Financial AI', chuyên gia quản lý tài chính cá nhân.\n" +
-                                "Dữ liệu thực tế của homie %s:\n%s\n" +
-                                "Hãy phân tích và đưa ra lời khuyên ngắn gọn (dưới 150 từ), dùng các icon phù hợp, ngôn ngữ thân thiện, khích lệ. "
-                                +
-                                "Tập trung vào cân đối thu chi và mục tiêu tiết kiệm.",
-                        currentUser.getUsername(), contextData);
+            Map<String, Object> request = new HashMap<>();
+            request.put("username", currentUser.getUsername());
+            request.put("financial_context", contextData);
 
-                return callGeminiAiRaw(prompt, null);
-            }
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
 
-            return "🤖 Homie AI cần API Key để phân tích chuyên sâu. Nhưng nhìn sơ bộ, hãy cố gắng duy trì thói quen ghi chép nhé!";
+            JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
+            return response.get("answer").asText();
+
         } catch (Exception e) {
-            return "🤖 Homie AI đang bận xử lý dữ liệu một chút. Đừng lo, tài chính của bạn vẫn ổn! (Lỗi: "
-                    + e.getMessage() + ")";
+            return "🤖 Homie AI đang bận bảo trì bộ não Python một chút. (Lỗi: " + e.getMessage() + ")";
         }
     }
 
     /**
-     * Chat tương tác với AI hỗ trợ History
+     * Chat tương tác với AI hỗ trợ History - Gọi qua Python Microservice
      */
     public String chatWithAi(String userMessage, List<Map<String, String>> history) {
         User currentUser = securityUtils.getCurrentUser();
         String contextData = getFinancialContext();
 
-        // System Instruction - Định hình tính cách AI
-        String systemInstruction = String.format(
-                "Bạn là 'Homie Financial AI' - người trợ lý tài chính thông minh, tận tâm và thân thiện của homie %s.\n"
-                        +
-                        "Dữ liệu tài chính tháng này của người dùng:\n%s\n" +
-                        "QUY TẮC:\n" +
-                        "1. Luôn trả lời dựa trên dữ liệu thực tế được cung cấp nếu câu hỏi liên quan đến tiền bạc.\n" +
-                        "2. Ngôn ngữ: Tiếng Việt, trẻ trung, dùng 'homie', 'bạn' và các icon 💸, 🚀, 🐷.\n" +
-                        "3. Ngắn gọn, súc tích, đi thẳng vào vấn đề.\n" +
-                        "4. Nếu người dùng hỏi ngoài lề, hãy khéo léo dẫn dắt về việc quản lý tài chính.",
-                currentUser.getUsername(), contextData);
+        try {
+            String url = aiConfig.getApiUrl() + "/api/ai/chat";
 
-        // Kết hợp System Instruction vào tin nhắn đầu tiên của Prompt nếu dùng Gemini
-        // 1.5 Flash (hoặc dùng System Instruction API nếu có hỗ trợ)
-        // Ở đây ta dùng cách đơn giản: chèn vào đầu chuỗi tin nhắn cuối
-        String promptWithContext = "Bối cảnh: " + systemInstruction + "\n\nCâu hỏi: " + userMessage;
+            Map<String, Object> request = new HashMap<>();
+            request.put("username", currentUser.getUsername());
+            request.put("user_message", userMessage);
+            request.put("financial_context", contextData);
+            request.put("history", history);
 
-        if (aiConfig.getApiKey() != null && !aiConfig.getApiKey().isBlank()) {
-            try {
-                return callGeminiAiRaw(promptWithContext, history);
-            } catch (Exception e) {
-                return "Xin lỗi homie, bộ não AI của tôi đang hơi 'lag' một chút. Thử lại sau nhé! 😅";
-            }
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
+
+            JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
+            return response.get("answer").asText();
+
+        } catch (Exception e) {
+            return "Xin lỗi homie, bộ não AI Python đang hơi 'lag'. Thử lại sau nhé! 😅";
         }
-        return "Tính năng chat yêu cầu Gemini API Key để hoạt động.";
     }
 
-    /**
-     * Thu thập dữ liệu tài chính chi tiết
-     */
+    public JsonNode callGeminiAiRaw(String prompt, String base64Image, String mimeType) {
+        return null;
+    }
+
     private String getFinancialContext() {
         YearMonth now = YearMonth.now();
         List<StatisticResponse> stats = transactionService.getCategoryStatistics(now.atDay(1), now.atEndOfMonth());
@@ -130,146 +118,8 @@ public class AiService {
         return String.format(
                 "- Tổng thu: %,.0fđ\n" +
                         "- Tổng chi: %,.0fđ\n" +
-                        "- Chi tiết: %s\n" +
-                        "- Mục tiêu tiết kiệm:\n%s",
+                        "- Chi tiết chi tiêu: %s\n" +
+                        "- Các mục tiêu tiết kiệm:\n%s",
                 totalIncome, totalExpense, categoryDetails, goalsSummary);
-    }
-
-    public JsonNode callGeminiAiRaw(String prompt, String base64Image, String mimeType) {
-        if (aiConfig.getApiKey() == null || aiConfig.getApiKey().isBlank()) {
-            throw new RuntimeException("Chưa cấu hình API Key cho Gemini!");
-        }
-
-        String url = aiConfig.getApiUrl() + "?key=" + aiConfig.getApiKey();
-        GeminiRequest request = new GeminiRequest();
-        Content content = new Content("user");
-
-        // Thêm text prompt
-        content.getParts().add(new Part(prompt));
-
-        // Thêm ảnh nếu có
-        if (base64Image != null && mimeType != null) {
-            content.getParts().add(new Part(new InlineData(mimeType, base64Image)));
-        }
-
-        request.getContents().add(content);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<GeminiRequest> entity = new HttpEntity<>(request, headers);
-
-        try {
-            JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
-            if (response != null && response.has("candidates")) {
-                String rawText = response.get("candidates").get(0)
-                        .path("content").path("parts").get(0)
-                        .path("text").asText();
-
-                // Trả về JsonNode parse từ text của AI
-                String cleanJson = rawText.replaceAll("```json", "").replaceAll("```", "").trim();
-                return new com.fasterxml.jackson.databind.ObjectMapper().readTree(cleanJson);
-            }
-        } catch (Exception e) {
-            System.err.println("Lỗi gọi Gemini Vision: " + e.getMessage());
-            throw new RuntimeException("Không thể phân tích ảnh qua AI: " + e.getMessage());
-        }
-        return null;
-    }
-
-    public String callGeminiAiRaw(String prompt, List<Map<String, String>> history) {
-        if (aiConfig.getApiKey() == null || aiConfig.getApiKey().isBlank()) {
-            return "Homie ơi, chưa có API Key nên mình chưa 'thông thái' được. Hãy thiết lập API Key nhé!";
-        }
-
-        String url = aiConfig.getApiUrl() + "?key=" + aiConfig.getApiKey();
-        GeminiRequest request = new GeminiRequest();
-
-        if (history != null) {
-            for (Map<String, String> msg : history) {
-                String role = "user".equalsIgnoreCase(msg.get("role")) ? "user" : "model";
-                request.getContents().add(new Content(role, msg.get("content")));
-            }
-        }
-        request.getContents().add(new Content("user", prompt));
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<GeminiRequest> entity = new HttpEntity<>(request, headers);
-
-        try {
-            // Sử dụng JsonNode để linh hoạt hơn trong việc đọc Response
-            JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
-
-            if (response != null && response.has("candidates")) {
-                JsonNode candidates = response.get("candidates");
-                if (candidates.isArray() && candidates.size() > 0) {
-                    return candidates.get(0)
-                            .path("content")
-                            .path("parts").get(0)
-                            .path("text").asText();
-                }
-            }
-
-            System.err.println("Gemini Response lạ: " + response);
-            return "Gemini trả về kết quả trống hoặc bị chặn nội dung rồi homie!";
-
-        } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
-            return "Homie dùng 'hao' quá, Gemini bảo là hết lượt miễn phí rồi. Chờ chút nhé! ⏳";
-        } catch (Exception e) {
-            System.err.println("Lỗi kết nối Gemini: " + e.getMessage());
-            return "Không thể kết nối với não bộ AI. Homie kiểm tra mạng hoặc API Key nhé!";
-        }
-    }
-
-    // --- Gemini API DTOs ---
-    @Data
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-    static class GeminiRequest {
-        private List<Content> contents = new ArrayList<>();
-    }
-
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-    static class Content {
-        private String role; // "user" or "model"
-        private List<Part> parts = new ArrayList<>();
-
-        public Content(String role, String text) {
-            this.role = role;
-            this.parts = new ArrayList<>();
-            this.parts.add(new Part(text));
-        }
-
-        public Content(String role) {
-            this.role = role;
-            this.parts = new ArrayList<>();
-        }
-    }
-
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-    static class Part {
-        private String text;
-        private InlineData inlineData;
-
-        public Part(String text) {
-            this.text = text;
-        }
-
-        public Part(InlineData inlineData) {
-            this.inlineData = inlineData;
-        }
-    }
-
-    @Data
-    @AllArgsConstructor
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-    static class InlineData {
-        private String mimeType;
-        private String data;
     }
 }
