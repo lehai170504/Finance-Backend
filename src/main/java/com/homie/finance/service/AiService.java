@@ -1,5 +1,6 @@
 package com.homie.finance.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.homie.finance.dto.StatisticResponse;
 import com.homie.finance.entity.User;
 import com.homie.finance.security.SecurityUtils;
@@ -135,19 +136,19 @@ public class AiService {
     }
 
     private String callGeminiAiRaw(String prompt, List<Map<String, String>> history) {
-        String url = aiConfig.getApiUrl() + "?key=" + aiConfig.getApiKey();
+        if (aiConfig.getApiKey() == null || aiConfig.getApiKey().isBlank()) {
+            return "Homie ơi, chưa có API Key nên mình chưa 'thông thái' được. Hãy thiết lập API Key nhé!";
+        }
 
+        String url = aiConfig.getApiUrl() + "?key=" + aiConfig.getApiKey();
         GeminiRequest request = new GeminiRequest();
 
-        // 1. Thêm History vào contents
         if (history != null) {
             for (Map<String, String> msg : history) {
                 String role = "user".equalsIgnoreCase(msg.get("role")) ? "user" : "model";
                 request.getContents().add(new Content(role, msg.get("content")));
             }
         }
-
-        // 2. Thêm tin nhắn hiện tại
         request.getContents().add(new Content("user", prompt));
 
         HttpHeaders headers = new HttpHeaders();
@@ -155,15 +156,28 @@ public class AiService {
         HttpEntity<GeminiRequest> entity = new HttpEntity<>(request, headers);
 
         try {
-            GeminiResponse response = restTemplate.postForObject(url, entity, GeminiResponse.class);
-            if (response != null && response.getCandidates() != null && !response.getCandidates().isEmpty()) {
-                return response.getCandidates().get(0).getContent().getParts().get(0).getText();
+            // Sử dụng JsonNode để linh hoạt hơn trong việc đọc Response
+            JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
+
+            if (response != null && response.has("candidates")) {
+                JsonNode candidates = response.get("candidates");
+                if (candidates.isArray() && candidates.size() > 0) {
+                    return candidates.get(0)
+                            .path("content")
+                            .path("parts").get(0)
+                            .path("text").asText();
+                }
             }
+
+            System.err.println("Gemini Response lạ: " + response);
+            return "Gemini trả về kết quả trống hoặc bị chặn nội dung rồi homie!";
+
+        } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+            return "Homie dùng 'hao' quá, Gemini bảo là hết lượt miễn phí rồi. Chờ chút nhé! ⏳";
         } catch (Exception e) {
-            System.err.println("Gemini API Error: " + e.getMessage());
-            throw e;
+            System.err.println("Lỗi kết nối Gemini: " + e.getMessage());
+            return "Không thể kết nối với não bộ AI. Homie kiểm tra mạng hoặc API Key nhé!";
         }
-        return "AI không phản hồi, thử lại sau nhé!";
     }
 
     // --- Gemini API DTOs ---
@@ -182,16 +196,6 @@ public class AiService {
         public Content(String role, String text) {
             this.role = role;
             this.parts.add(new Part(text));
-        }
-    }
-
-    @Data
-    static class GeminiResponse {
-        private List<Candidate> candidates;
-
-        @Data
-        static class Candidate {
-            private Content content;
         }
     }
 
