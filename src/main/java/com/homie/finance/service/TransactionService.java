@@ -64,11 +64,11 @@ public class TransactionService {
 
     private GroupSpace requireGroupMembership(String groupId, User currentUser) {
         GroupSpace group = groupSpaceRepository.findByIdWithMembers(groupId)
-                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay nhom!"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhóm!"));
 
         if (group.getMembers() == null
                 || group.getMembers().stream().noneMatch(member -> member.getId().equals(currentUser.getId()))) {
-            throw new IllegalArgumentException("Ban khong co quyen truy cap nhom nay!");
+            throw new IllegalArgumentException("Bạn không có quyền truy cập nhóm này!");
         }
 
         return group;
@@ -85,23 +85,23 @@ public class TransactionService {
             if (suggestedId != null) {
                 categoryId = suggestedId;
             } else {
-                throw new IllegalArgumentException("Vui long chon danh muc cho giao dich nay!");
+                throw new IllegalArgumentException("Vui lòng chọn danh mục cho giao dịch này!");
             }
         }
 
         Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay danh muc!"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy danh mục!"));
 
         Wallet wallet = walletRepository.findById(walletId)
-                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay vi!"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ví!"));
 
         if (!wallet.getUser().getId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("Vi nay khong thuoc ve ban!");
+            throw new IllegalArgumentException("Ví này không thuộc về bạn!");
         }
 
         if ("EXPENSE".equals(category.getType())) {
             if (wallet.getBalance() < request.getAmount()) {
-                throw new IllegalArgumentException("So du khong du de thuc hien giao dich nay!");
+                throw new IllegalArgumentException("Số dư không đủ để thực hiện giao dịch này!");
             }
             wallet.setBalance(wallet.getBalance() - request.getAmount());
         } else {
@@ -125,11 +125,11 @@ public class TransactionService {
         Transaction savedTx = transactionRepository.save(transaction);
 
         logService.saveLog(savedTx.getId(), currentUser.getUsername(), "CREATE",
-                String.format("Tao moi: %.0fd [%s] - Danh muc: %s",
+                String.format("Tạo mới: %.0fd [%s] - Danh mục: %s",
                         savedTx.getAmount(), savedTx.getNote(), category.getName()));
 
         if (wallet.getBalance() < 100000) {
-            notificationService.createNotification(currentUser, "Vi '" + wallet.getName() + "' sap can tien roi!");
+            notificationService.createNotification(currentUser, "Ví '" + wallet.getName() + "' sắp cạn tiền rồi!");
         }
 
         if ("EXPENSE".equals(category.getType())) {
@@ -162,8 +162,8 @@ public class TransactionService {
                 debt.setSettled(false);
                 debtRepository.save(debt);
 
-                String msg = "Ban co khoan no moi: " + String.format("%.0f", shareAmount)
-                        + "d tu " + transaction.getUser().getUsername() + " cho \"" + transaction.getNote() + "\"";
+                String msg = "Bạn có khoản nợ mới: " + String.format("%.0f", shareAmount)
+                        + "d từ " + transaction.getUser().getUsername() + " cho \"" + transaction.getNote() + "\"";
                 notificationService.createNotification(member, msg);
             }
         }
@@ -189,11 +189,11 @@ public class TransactionService {
         Category newCategory = categoryRepository.findById(newCategoryId).orElseThrow();
 
         if (!newWallet.getUser().getId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("Vi moi khong thuoc ve ban!");
+            throw new IllegalArgumentException("Ví mới không thuộc về bạn!");
         }
 
         if ("EXPENSE".equals(newCategory.getType()) && newWallet.getBalance() < request.getAmount()) {
-            throw new IllegalArgumentException("Vi moi khong du so du de thuc hien thay doi nay!");
+            throw new IllegalArgumentException("Ví mới không đủ số dư để thực hiện thay đổi này!");
         }
 
         if ("EXPENSE".equals(newCategory.getType())) {
@@ -203,7 +203,7 @@ public class TransactionService {
         }
         walletRepository.save(newWallet);
 
-        String logDetail = String.format("Sua: %.0f -> %.0f | Ghi chu: '%s' -> '%s'",
+        String logDetail = String.format("Sửa: %.0f -> %.0f | Ghi chú: '%s' -> '%s'",
                 oldTx.getAmount(), request.getAmount(), oldTx.getNote(), request.getNote());
         logService.saveLog(oldTx.getId(), currentUser.getUsername(), "UPDATE", logDetail);
 
@@ -235,7 +235,7 @@ public class TransactionService {
         securityUtils.validateTransactionOwner(transaction, currentUser);
 
         if (transaction.isDeleted()) {
-            throw new IllegalArgumentException("Giao dich nay da o trong thung rac roi!");
+            throw new IllegalArgumentException("Giao dịch này đã ở trong thùng rác rồi!");
         }
 
         Wallet wallet = transaction.getWallet();
@@ -252,7 +252,7 @@ public class TransactionService {
 
         transaction.setDeleted(true);
         transaction.setDeletedAt(LocalDateTime.now());
-        logService.saveLog(transaction.getId(), currentUser.getUsername(), "DELETE", "Xoa giao dich vao thung rac");
+        logService.saveLog(transaction.getId(), currentUser.getUsername(), "DELETE", "Xóa giao dịch vào thùng rác");
         transactionRepository.save(transaction);
 
         List<Debt> existingDebts = debtRepository.findByTransaction(transaction);
@@ -275,7 +275,7 @@ public class TransactionService {
         securityUtils.validateTransactionOwner(transaction, currentUser);
 
         if (!transaction.isDeleted()) {
-            throw new IllegalArgumentException("Giao dich khong nam trong thung rac!");
+            throw new IllegalArgumentException("Giao dịch không nằm trong thùng rác!");
         }
 
         Wallet wallet = transaction.getWallet();
@@ -292,7 +292,7 @@ public class TransactionService {
         transaction.setDeleted(false);
         transaction.setDeletedAt(null);
         logService.saveLog(transaction.getId(), currentUser.getUsername(), "RESTORE",
-                "Khoi phuc giao dich tu thung rac");
+                "Khôi phục giao dịch từ thùng rác");
         Transaction restoredTx = transactionRepository.save(transaction);
 
         if (restoredTx.getGroupSpace() != null) {
@@ -309,7 +309,7 @@ public class TransactionService {
         securityUtils.validateTransactionOwner(transaction, currentUser);
 
         if (!transaction.isDeleted()) {
-            throw new IllegalArgumentException("Chi duoc xoa vinh vien giao dich dang o trong thung rac!");
+            throw new IllegalArgumentException("Chỉ được xóa vĩnh viễn giao dịch đang ở trong thùng rác!");
         }
 
         List<Debt> existingDebts = debtRepository.findByTransaction(transaction);
@@ -433,8 +433,8 @@ public class TransactionService {
                     if (spent + request.getAmount() > limit) {
                         alertService.sendBudgetAlertEmail(currentUser.getEmail(), currentUser.getUsername(),
                                 category.getName(), limit);
-                        String msg = "Canh bao: Ban da chi tieu vuot dinh muc cua danh muc " + category.getName()
-                                + " (Han muc: " + String.format("%.0f", limit) + "d)";
+                        String msg = "Cảnh báo: Bạn đã chi tiêu vượt định mức của danh mục " + category.getName()
+                                + " (Hạn mức: " + String.format("%.0f", limit) + "d)";
                         notificationService.createNotification(currentUser, msg);
                     }
                 });
@@ -451,16 +451,16 @@ public class TransactionService {
     public void settleDebt(String debtId) {
         User currentUser = securityUtils.getCurrentUser();
         Debt debt = debtRepository.findById(debtId)
-                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay khoan no nay!"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy khoản nợ này!"));
 
         if (!debt.getCreditor().getId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("Chi chu no moi co quyen xac nhan thanh toan!");
+            throw new IllegalArgumentException("Chỉ chủ nợ mới có quyền xác nhận thanh toán!");
         }
 
         debt.setSettled(true);
         debtRepository.save(debt);
 
-        String msg = currentUser.getUsername() + " da xac nhan ban tra xong khoan no " + debt.getAmount() + "d.";
+        String msg = currentUser.getUsername() + " đã xác nhận bạn trả xong khoản nợ " + debt.getAmount() + "d.";
         notificationService.createNotification(debt.getDebtor(), msg);
     }
 
@@ -555,14 +555,14 @@ public class TransactionService {
     public TransactionResponse createSystemTransaction(String walletId, String categoryId, User user,
             TransactionRequest request) {
         Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay danh muc!"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy danh mục!"));
 
         Wallet wallet = walletRepository.findById(walletId)
-                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay vi!"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ví!"));
 
         if ("EXPENSE".equals(category.getType())) {
             if (wallet.getBalance() < request.getAmount()) {
-                throw new IllegalArgumentException("So du khong du de thuc hien giao dich dinh ky!");
+                throw new IllegalArgumentException("Số dư không đủ để thực hiện giao dịch định kỳ!");
             }
             wallet.setBalance(wallet.getBalance() - request.getAmount());
         } else {
@@ -582,12 +582,12 @@ public class TransactionService {
         Transaction savedTx = transactionRepository.save(transaction);
 
         logService.saveLog(savedTx.getId(), "HE THONG", "CREATE_AUTO",
-                String.format("He thong tu dong tao: %.0fd [%s] - Danh muc: %s",
+                String.format("Hệ thống tự động tạo: %.0fd [%s] - Danh mục: %s",
                         savedTx.getAmount(), savedTx.getNote(), category.getName()));
 
         if (wallet.getBalance() < 100000) {
             notificationService.createNotification(user,
-                    "Canh bao: Vi '" + wallet.getName() + "' sap can tien sau khi tru phi dinh ky!");
+                    "Cảnh báo: Ví '" + wallet.getName() + "' sắp cạn tiền sau khi trừ phí định kỳ!");
         }
 
         if ("EXPENSE".equals(category.getType())) {

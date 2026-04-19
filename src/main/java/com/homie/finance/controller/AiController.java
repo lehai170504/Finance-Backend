@@ -27,6 +27,7 @@ public class AiController {
     public ResponseEntity<Map<String, String>> chat(
             @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
         String message = (String) body.get("message");
+        @SuppressWarnings("unchecked")
         List<Map<String, String>> history = (List<Map<String, String>>) body.get("history");
 
         String response = aiService.chatWithAi(message, history);

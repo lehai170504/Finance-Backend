@@ -28,7 +28,7 @@ public class WalletService {
     private User getCurrentLoggedInUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Loi xac thuc nguoi dung!"));
+                .orElseThrow(() -> new RuntimeException("Lỗi xác thực người dùng!"));
     }
 
     private void validatePositiveAmount(Double amount, String message) {
@@ -60,25 +60,25 @@ public class WalletService {
     public void transferMoney(String fromId, String toId, Double amount) {
         User currentUser = getCurrentLoggedInUser();
 
-        validatePositiveAmount(amount, "So tien chuyen phai lon hon 0!");
+        validatePositiveAmount(amount, "Số tiền chuyển phải lớn hơn 0!");
         if (fromId.equals(toId)) {
-            throw new IllegalArgumentException("Khong the chuyen tien trong cung mot vi!");
+            throw new IllegalArgumentException("Không thể chuyển tiền trong cùng một ví!");
         }
 
         if (!walletRepository.existsByIdAndUser(fromId, currentUser)) {
-            throw new IllegalArgumentException("Vi nguon khong ton tai hoac khong thuoc ve ban!");
+            throw new IllegalArgumentException("Ví nguồn không tồn tại hoặc không thuộc về bạn!");
         }
 
         if (!walletRepository.existsByIdAndUser(toId, currentUser)) {
-            throw new IllegalArgumentException("Vi dich khong thuoc ve ban!");
+            throw new IllegalArgumentException("Ví đích không thuộc về bạn!");
         }
 
         Wallet fromWallet = walletRepository.findById(fromId).orElseThrow();
         Wallet toWallet = walletRepository.findById(toId)
-                .orElseThrow(() -> new IllegalArgumentException("Khong tim thay vi dich"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ví đích"));
 
         if (fromWallet.getBalance() < amount) {
-            throw new IllegalArgumentException("So du vi nguon khong du!");
+            throw new IllegalArgumentException("Số dư ví nguồn không đủ!");
         }
 
         fromWallet.setBalance(fromWallet.getBalance() - amount);
@@ -150,7 +150,7 @@ public class WalletService {
 
         if (request.getBalance() != null && !request.getBalance().equals(wallet.getBalance())) {
             throw new IllegalArgumentException(
-                    "Khong duoc sua truc tiep so du vi. Hay tao giao dich hoac chuyen tien.");
+                    "Không được sửa trực tiếp số dư ví. Hãy tạo giao dịch hoặc chuyển tiền.");
         }
 
         return walletRepository.save(wallet);
@@ -162,14 +162,14 @@ public class WalletService {
         User currentUser = getCurrentLoggedInUser();
 
         if (!walletRepository.existsByIdAndUser(id, currentUser)) {
-            throw new RuntimeException("Vi khong ton tai hoac ban khong co quyen xoa!");
+            throw new RuntimeException("Ví không tồn tại hoặc bạn không có quyền xóa!");
         }
 
         Wallet wallet = walletRepository.findById(id).orElseThrow();
 
         if (wallet.getBalance() != null && wallet.getBalance() > 0) {
             throw new IllegalArgumentException(
-                    "Vi van con tien (" + wallet.getBalance() + "). Phai chuyen het tien truoc khi xoa.");
+                    "Ví còn tiền (" + wallet.getBalance() + "). Phải chuyển hết tiền trước khi xóa.");
         }
 
         wallet.setDeleted(true);
