@@ -19,4 +19,7 @@ public class TransactionRequest {
     @NotNull(message = "Ngày tháng không được bỏ trống!")
     @Schema(description = "Ngày thực hiện giao dịch", example = "2026-03-18")
     private LocalDate date;
+
+    @Schema(description = "Link ảnh hóa đơn (Nếu có)", example = "http://res.cloudinary.com/...")
+    private String receiptUrl;
 }

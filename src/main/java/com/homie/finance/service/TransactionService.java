@@ -117,6 +117,7 @@ public class TransactionService {
         transaction.setWallet(wallet);
         transaction.setUser(currentUser);
         transaction.setDeleted(false);
+        transaction.setReceiptUrl(request.getReceiptUrl());
 
         if (groupId != null && !groupId.isEmpty()) {
             transaction.setGroupSpace(requireGroupMembership(groupId, currentUser));
@@ -212,6 +213,7 @@ public class TransactionService {
         oldTx.setDate(request.getDate());
         oldTx.setCategory(newCategory);
         oldTx.setWallet(newWallet);
+        oldTx.setReceiptUrl(request.getReceiptUrl());
 
         if (oldTx.getGroupSpace() != null) {
             List<Debt> existingDebts = debtRepository.findByTransaction(oldTx);
@@ -578,6 +580,7 @@ public class TransactionService {
         transaction.setWallet(wallet);
         transaction.setUser(user);
         transaction.setDeleted(false);
+        transaction.setReceiptUrl(request.getReceiptUrl());
 
         Transaction savedTx = transactionRepository.save(transaction);
 
