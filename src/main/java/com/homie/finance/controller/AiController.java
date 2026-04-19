@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -23,9 +24,12 @@ public class AiController {
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/chat")
-    public ResponseEntity<Map<String, String>> chat(@org.springframework.web.bind.annotation.RequestBody Map<String, String> body) {
-        String message = body.get("message");
-        String response = aiService.chatWithAi(message);
+    public ResponseEntity<Map<String, String>> chat(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+        String message = (String) body.get("message");
+        List<Map<String, String>> history = (List<Map<String, String>>) body.get("history");
+
+        String response = aiService.chatWithAi(message, history);
         return ResponseEntity.ok(Map.of("response", response));
     }
 }
