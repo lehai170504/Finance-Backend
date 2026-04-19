@@ -223,6 +223,7 @@ public class AiService {
 
     // --- Gemini API DTOs ---
     @Data
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     static class GeminiRequest {
         private List<Content> contents = new ArrayList<>();
     }
@@ -230,12 +231,14 @@ public class AiService {
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     static class Content {
         private String role; // "user" or "model"
         private List<Part> parts = new ArrayList<>();
 
         public Content(String role, String text) {
             this.role = role;
+            this.parts = new ArrayList<>();
             this.parts.add(new Part(text));
         }
 
@@ -248,6 +251,7 @@ public class AiService {
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     static class Part {
         private String text;
         private InlineData inlineData;
@@ -263,6 +267,7 @@ public class AiService {
 
     @Data
     @AllArgsConstructor
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     static class InlineData {
         private String mimeType;
         private String data;
