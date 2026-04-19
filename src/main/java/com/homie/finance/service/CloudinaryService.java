@@ -40,6 +40,7 @@ public class CloudinaryService {
             System.err.println("Không thể xóa ảnh cũ trên mây: " + e.getMessage());
         }
     }
+
     private String extractPublicId(String imageUrl) {
         try {
             String[] parts = imageUrl.split("/");

@@ -1,5 +1,6 @@
 package com.homie.finance.service;
 
+import com.homie.finance.dto.BulkTransactionRequest;
 import com.homie.finance.dto.DebtResponse;
 import com.homie.finance.dto.GroupStatsResponse;
 import com.homie.finance.dto.PageResponse;
@@ -72,6 +73,20 @@ public class TransactionService {
         }
 
         return group;
+    }
+
+    @Transactional
+    public List<TransactionResponse> createMultipleTransactions(BulkTransactionRequest bulkRequest) {
+        return bulkRequest.getItems().stream().map(item -> {
+            TransactionRequest request = new TransactionRequest();
+            request.setAmount(item.getAmount());
+            request.setNote(item.getNote());
+            request.setDate(bulkRequest.getDate());
+            request.setReceiptUrl(bulkRequest.getReceiptUrl());
+
+            return createTransaction(bulkRequest.getWalletId(), item.getCategoryId(), bulkRequest.getGroupId(),
+                    request);
+        }).collect(Collectors.toList());
     }
 
     @Transactional

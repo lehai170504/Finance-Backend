@@ -86,6 +86,14 @@ public class TransactionController {
         return new ApiResponse<>(201, "Đã ghi chép giao dịch mới!", data);
     }
 
+    @PostMapping("/bulk-create")
+    @Operation(summary = "Thêm nhiều giao dịch cùng lúc (Split Bill)", description = "Dùng cho hóa đơn có nhiều món hàng. Hệ thống tự động tách và trừ tiền ví.")
+    public ApiResponse<List<TransactionResponse>> createMultipleTransactions(
+            @Valid @RequestBody BulkTransactionRequest request) {
+        List<TransactionResponse> data = transactionService.createMultipleTransactions(request);
+        return new ApiResponse<>(201, "Đã ghi chép thành công " + data.size() + " món hàng!", data);
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Sửa giao dịch", description = "Cập nhật lại thông tin giao dịch hoặc đổi sang ví/danh mục khác.")
     public ApiResponse<TransactionResponse> updateTransaction(

@@ -135,7 +135,48 @@ public class AiService {
                 totalIncome, totalExpense, categoryDetails, goalsSummary);
     }
 
-    private String callGeminiAiRaw(String prompt, List<Map<String, String>> history) {
+    public JsonNode callGeminiAiRaw(String prompt, String base64Image, String mimeType) {
+        if (aiConfig.getApiKey() == null || aiConfig.getApiKey().isBlank()) {
+            throw new RuntimeException("Chưa cấu hình API Key cho Gemini!");
+        }
+
+        String url = aiConfig.getApiUrl() + "?key=" + aiConfig.getApiKey();
+        GeminiRequest request = new GeminiRequest();
+        Content content = new Content("user");
+
+        // Thêm text prompt
+        content.getParts().add(new Part(prompt));
+
+        // Thêm ảnh nếu có
+        if (base64Image != null && mimeType != null) {
+            content.getParts().add(new Part(new InlineData(mimeType, base64Image)));
+        }
+
+        request.getContents().add(content);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<GeminiRequest> entity = new HttpEntity<>(request, headers);
+
+        try {
+            JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
+            if (response != null && response.has("candidates")) {
+                String rawText = response.get("candidates").get(0)
+                        .path("content").path("parts").get(0)
+                        .path("text").asText();
+
+                // Trả về JsonNode parse từ text của AI
+                String cleanJson = rawText.replaceAll("```json", "").replaceAll("```", "").trim();
+                return new com.fasterxml.jackson.databind.ObjectMapper().readTree(cleanJson);
+            }
+        } catch (Exception e) {
+            System.err.println("Lỗi gọi Gemini Vision: " + e.getMessage());
+            throw new RuntimeException("Không thể phân tích ảnh qua AI: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public String callGeminiAiRaw(String prompt, List<Map<String, String>> history) {
         if (aiConfig.getApiKey() == null || aiConfig.getApiKey().isBlank()) {
             return "Homie ơi, chưa có API Key nên mình chưa 'thông thái' được. Hãy thiết lập API Key nhé!";
         }
@@ -197,6 +238,11 @@ public class AiService {
             this.role = role;
             this.parts.add(new Part(text));
         }
+
+        public Content(String role) {
+            this.role = role;
+            this.parts = new ArrayList<>();
+        }
     }
 
     @Data
@@ -204,5 +250,21 @@ public class AiService {
     @NoArgsConstructor
     static class Part {
         private String text;
+        private InlineData inlineData;
+
+        public Part(String text) {
+            this.text = text;
+        }
+
+        public Part(InlineData inlineData) {
+            this.inlineData = inlineData;
+        }
+    }
+
+    @Data
+    @AllArgsConstructor
+    static class InlineData {
+        private String mimeType;
+        private String data;
     }
 }
