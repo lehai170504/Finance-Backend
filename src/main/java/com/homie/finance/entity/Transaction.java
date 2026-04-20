@@ -52,7 +52,6 @@ public class Transaction {
     private GroupSpace groupSpace;
 
 
-    @Column(name = "is_deleted")
     @Schema(description = "Loại giao dịch: INCOME hoặc EXPENSE", example = "EXPENSE")
     private String type;
 
