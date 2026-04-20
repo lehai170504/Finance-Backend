@@ -53,11 +53,33 @@ public class Transaction {
 
 
     @Column(name = "is_deleted")
+    @Schema(description = "Loại giao dịch: INCOME hoặc EXPENSE", example = "EXPENSE")
+    private String type;
+
+    @Column(name = "is_deleted")
     @Schema(hidden = true)
     private boolean isDeleted = false;
 
     @Column(name = "deleted_at")
     @Schema(hidden = true)
     private LocalDateTime deletedAt;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.type == null) {
+            if (this.category != null) {
+                this.type = this.category.getType();
+            } else {
+                this.type = "EXPENSE";
+            }
+        }
+    }
+
+    @PostLoad
+    public void postLoad() {
+        if (this.type == null && this.category != null) {
+            this.type = this.category.getType();
+        }
+    }
 
 }

@@ -133,6 +133,7 @@ public class TransactionService {
         transaction.setUser(currentUser);
         transaction.setDeleted(false);
         transaction.setReceiptUrl(request.getReceiptUrl());
+        transaction.setType(category.getType());
 
         if (groupId != null && !groupId.isEmpty()) {
             transaction.setGroupSpace(requireGroupMembership(groupId, currentUser));
@@ -596,6 +597,7 @@ public class TransactionService {
         transaction.setUser(user);
         transaction.setDeleted(false);
         transaction.setReceiptUrl(request.getReceiptUrl());
+        transaction.setType(category.getType());
 
         Transaction savedTx = transactionRepository.save(transaction);
 

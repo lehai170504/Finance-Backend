@@ -77,6 +77,14 @@ public class WalletService {
         Wallet toWallet = walletRepository.findById(toId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ví đích"));
 
+        if (fromWallet.isDeleted()) {
+            throw new IllegalArgumentException("Ví nguồn đã bị xóa!");
+        }
+
+        if (toWallet.isDeleted()) {
+            throw new IllegalArgumentException("Ví đích đã bị xóa!");
+        }
+
         if (fromWallet.getBalance() < amount) {
             throw new IllegalArgumentException("Số dư ví nguồn không đủ!");
         }
@@ -117,6 +125,7 @@ public class WalletService {
         txOut.setWallet(fromWallet);
         txOut.setUser(currentUser);
         txOut.setDeleted(false);
+        txOut.setType("EXPENSE");
         transactionRepository.save(txOut);
 
         com.homie.finance.entity.Transaction txIn = new com.homie.finance.entity.Transaction();
@@ -127,6 +136,7 @@ public class WalletService {
         txIn.setWallet(toWallet);
         txIn.setUser(currentUser);
         txIn.setDeleted(false);
+        txIn.setType("INCOME");
         transactionRepository.save(txIn);
     }
 
