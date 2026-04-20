@@ -2,6 +2,7 @@ package com.homie.finance.repository;
 
 import com.homie.finance.dto.StatisticResponse;
 import com.homie.finance.entity.Category;
+import com.homie.finance.entity.GroupSpace;
 import com.homie.finance.entity.Transaction;
 import com.homie.finance.entity.User;
 import org.springframework.data.domain.Page;
@@ -103,4 +104,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
                         @Param("user") User user,
                         @Param("keyword") String keyword,
                         Pageable pageable);
+
+        void deleteByGroupSpace(GroupSpace groupSpace);
 }

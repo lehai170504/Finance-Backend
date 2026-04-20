@@ -35,6 +35,21 @@ public class AiService {
     @Autowired
     private SecurityUtils securityUtils;
 
+    // Hàm chung để tạo Headers có chứa API Key cho gọn code
+    private HttpHeaders createHeadersWithApiKey() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // 🔥 Nhét API Key vào Header
+        String apiKey = aiConfig.getApiKey();
+        if (apiKey != null && !apiKey.isEmpty()) {
+            // Tùy theo Python Microservice của ông thiết kế cấu hình nhận Key tên là gì
+            // Thường dùng "X-API-Key" hoặc "Authorization"
+            headers.set("X-API-Key", apiKey);
+        }
+        return headers;
+    }
+
     /**
      * Lấy lời khuyên tài chính định kỳ (Dashboard) - Gọi qua Python Microservice
      */
@@ -53,9 +68,8 @@ public class AiService {
             request.put("username", currentUser.getUsername());
             request.put("financial_context", contextData);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
+            // 🔥 Dùng hàm tạo header ở trên
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, createHeadersWithApiKey());
 
             JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
             return response.get("answer").asText();
@@ -85,9 +99,8 @@ public class AiService {
             request.put("financial_context", contextData);
             request.put("history", history);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
+            // 🔥 Dùng hàm tạo header ở trên
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, createHeadersWithApiKey());
 
             JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
             return response.get("answer").asText();
@@ -110,9 +123,8 @@ public class AiService {
             request.put("mime_type", mimeType);
             request.put("prompt", prompt);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
+            // 🔥 Dùng hàm tạo header ở trên
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, createHeadersWithApiKey());
 
             return restTemplate.postForObject(url, entity, JsonNode.class);
 

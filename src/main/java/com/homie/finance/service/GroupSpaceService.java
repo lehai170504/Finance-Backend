@@ -3,6 +3,7 @@ package com.homie.finance.service;
 import com.homie.finance.entity.GroupSpace;
 import com.homie.finance.entity.User;
 import com.homie.finance.repository.GroupSpaceRepository;
+import com.homie.finance.repository.TransactionRepository;
 import com.homie.finance.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,6 +26,9 @@ public class GroupSpaceService {
 
     @Autowired
     private com.homie.finance.repository.DebtRepository debtRepository;
+
+    @Autowired
+    private TransactionRepository transactionRepository;
 
     // Lấy User hiện tại từ Token
     private User getCurrentUser() {
@@ -116,6 +120,13 @@ public class GroupSpaceService {
         if (!group.getOwner().getId().equals(me.getId())) {
             throw new RuntimeException("Chỉ chủ nhóm mới được giải tán nhóm!");
         }
+
+        group.getMembers().clear();
+        groupSpaceRepository.save(group);
+
+        debtRepository.deleteByGroup(group);
+
+        transactionRepository.deleteByGroupSpace(group);
 
         groupSpaceRepository.delete(group);
     }
