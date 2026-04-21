@@ -137,14 +137,14 @@ public class AiService {
         List<StatisticResponse> stats = transactionService.getCategoryStatistics(now.atDay(1), now.atEndOfMonth());
 
         double totalExpense = stats.stream()
-                .filter(s -> "EXPENSE".equals(s.getCategoryType()))
+                .filter(s -> "EXPENSE".equals(s.getType()))
                 .mapToDouble(StatisticResponse::getTotalAmount).sum();
         double totalIncome = stats.stream()
-                .filter(s -> "INCOME".equals(s.getCategoryType()))
+                .filter(s -> "INCOME".equals(s.getType()))
                 .mapToDouble(StatisticResponse::getTotalAmount).sum();
 
         String categoryDetails = stats.stream()
-                .filter(s -> "EXPENSE".equals(s.getCategoryType()))
+                .filter(s -> "EXPENSE".equals(s.getType()))
                 .map(s -> String.format("%s: %,.0fđ", s.getCategoryName(), s.getTotalAmount()))
                 .collect(Collectors.joining(", "));
 
