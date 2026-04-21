@@ -187,7 +187,6 @@ public class TransactionService {
             throw new IllegalArgumentException("Ví mới không thuộc về bạn!");
         }
 
-        // 🔥 Gọi hàm Helper cho ví mới
         adjustWalletBalance(newWallet, newCategory, request.getAmount(), "Ví mới không đủ số dư để thực hiện thay đổi này!");
 
         String logDetail = String.format("Sửa: %.0f -> %.0f | Ghi chú: '%s' -> '%s'",
@@ -463,13 +462,8 @@ public class TransactionService {
         }
 
         if (transaction.getGroupSpace() != null) {
-            try {
-                res.setGroupId(transaction.getGroupSpace().getId());
-                res.setGroupName(transaction.getGroupSpace().getName());
-            } catch (Exception e) {
-                res.setGroupId(null);
-                res.setGroupName(null);
-            }
+            res.setGroupId(transaction.getGroupSpace().getId());
+            res.setGroupName(transaction.getGroupSpace().getName());
         }
 
         if (transaction.getUser() != null) {

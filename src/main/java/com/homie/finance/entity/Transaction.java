@@ -1,5 +1,6 @@
 package com.homie.finance.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -45,6 +46,8 @@ public class Transaction {
     @JoinColumn(name = "group_space_id")
     private GroupSpace groupSpace;
 
+    @Transient
+    @JsonIgnore
     public String getType() {
         if (this.category == null) return "EXPENSE";
         return this.category.getType();
