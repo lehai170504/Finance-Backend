@@ -46,7 +46,8 @@ public class Transaction {
     private GroupSpace groupSpace;
 
     public String getType() {
-        return (category != null) ? category.getType() : "EXPENSE";
+        if (this.category == null) return "EXPENSE";
+        return this.category.getType();
     }
 
     @Column(name = "is_deleted")

@@ -20,15 +20,13 @@ import java.util.Optional;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
+        @Query("SELECT t FROM Transaction t WHERE t.user = :user AND t.isDeleted = true")
+        List<Transaction> findTrashByUser(@Param("user") User user);
 
-        // Lấy rác (isDeleted = true)
-        @Query("SELECT t FROM Transaction t WHERE t.user.id = :userId AND t.isDeleted = true")
-        List<Transaction> findTrashByUser(@Param("userId") String userId);
-
-        // Tìm bao gồm cả rác
         @Query("SELECT t FROM Transaction t WHERE t.id = :id")
         Optional<Transaction> findByIdIncludingTrash(@Param("id") String id);
 
+        // Dùng EntityGraph để fetch category ngay lập tức, tránh lỗi Lazy ở hàm getType()
         @EntityGraph(attributePaths = {"category", "wallet"})
         Page<Transaction> findByUser(User user, Pageable pageable);
 
@@ -41,7 +39,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
         @EntityGraph(attributePaths = {"category", "wallet"})
         Page<Transaction> findByUserAndNoteContainingIgnoreCase(User user, String keyword, Pageable pageable);
 
-        // Thống kê theo Category
         @Query("SELECT new com.homie.finance.dto.statistic.StatisticResponse(c.name, c.type, SUM(t.amount)) " +
                 "FROM Transaction t JOIN t.category c " +
                 "WHERE t.user = :user AND t.date BETWEEN :startDate AND :endDate " +
@@ -51,7 +48,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
                 @Param("startDate") LocalDate startDate,
                 @Param("endDate") LocalDate endDate);
 
-        // Thống kê dòng tiền (CashFlow)
         @Query("SELECT new com.homie.finance.dto.transaction.CashFlowResponse(t.date, " +
                 "SUM(CASE WHEN c.type = 'INCOME' THEN t.amount ELSE 0.0 END), " +
                 "SUM(CASE WHEN c.type = 'EXPENSE' THEN t.amount ELSE 0.0 END)) " +
@@ -90,7 +86,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
         @EntityGraph(attributePaths = {"category", "user"})
         List<Transaction> findAllByGroupSpaceId(String groupSpaceId);
-
 
         void deleteByGroupSpace(GroupSpace groupSpace);
 }

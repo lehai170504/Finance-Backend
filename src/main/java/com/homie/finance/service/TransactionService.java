@@ -245,7 +245,7 @@ public class TransactionService {
 
     public List<TransactionResponse> getTrash() {
         User currentUser = securityUtils.getCurrentUser();
-        return transactionRepository.findTrashByUser(currentUser.getId())
+        return transactionRepository.findTrashByUser(currentUser)
                 .stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
@@ -448,10 +448,9 @@ public class TransactionService {
                 .receiptUrl(transaction.getReceiptUrl())
                 .build();
 
-        // 🔥 Fix: Lấy type thông qua hàm getType() của Entity (Hàm này lấy từ Category)
         if (transaction.getCategory() != null) {
             res.setCategoryName(transaction.getCategory().getName());
-            res.setType(transaction.getType()); // Gọi trực tiếp getter logic trong Entity
+            res.setType(transaction.getCategory().getType());
         } else {
             res.setCategoryName("Chưa phân loại");
             res.setType("EXPENSE");
