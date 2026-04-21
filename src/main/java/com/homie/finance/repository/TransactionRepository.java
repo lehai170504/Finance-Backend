@@ -32,7 +32,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
         @EntityGraph(attributePaths = {"category", "wallet"})
         Page<Transaction> findByUser(User user, Pageable pageable);
 
-        @Query("SELECT COALESCE(SUM(t.amount), 0.0) FROM Transaction t WHERE t.user = :user AND t.category.type = :type")
+        @Query("SELECT COALESCE(SUM(t.amount), 0.0) FROM Transaction t WHERE t.category.type = :type AND t.user = :user")
         Double sumAmountByUserAndType(@Param("user") User user, @Param("type") String type);
 
         @EntityGraph(attributePaths = {"category"})

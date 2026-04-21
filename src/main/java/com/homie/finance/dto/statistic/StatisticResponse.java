@@ -15,7 +15,7 @@ public class StatisticResponse implements Serializable {
     private String categoryName;
 
     @Schema(description = "Loại (INCOME/EXPENSE)", example = "EXPENSE")
-    private String categoryType;
+    private String type;
 
     @Schema(description = "Tổng tiền của danh mục này", example = "1500000")
     private Double totalAmount;
