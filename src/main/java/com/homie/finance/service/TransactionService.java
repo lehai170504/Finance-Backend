@@ -245,7 +245,7 @@ public class TransactionService {
 
     public List<TransactionResponse> getTrash() {
         User currentUser = securityUtils.getCurrentUser();
-        return transactionRepository.findTrashByUser(currentUser)
+        return transactionRepository.findTrashByUser(currentUser.getId())
                 .stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
@@ -438,6 +438,8 @@ public class TransactionService {
     }
 
     private TransactionResponse mapToDto(Transaction transaction) {
+        if (transaction == null) return null;
+
         TransactionResponse res = TransactionResponse.builder()
                 .id(transaction.getId())
                 .amount(transaction.getAmount())
@@ -446,21 +448,31 @@ public class TransactionService {
                 .receiptUrl(transaction.getReceiptUrl())
                 .build();
 
+        // 🔥 Fix: Lấy type thông qua hàm getType() của Entity (Hàm này lấy từ Category)
         if (transaction.getCategory() != null) {
             res.setCategoryName(transaction.getCategory().getName());
-            res.setType(transaction.getCategory().getType());
+            res.setType(transaction.getType()); // Gọi trực tiếp getter logic trong Entity
+        } else {
+            res.setCategoryName("Chưa phân loại");
+            res.setType("EXPENSE");
         }
+
         if (transaction.getWallet() != null) {
             res.setWalletName(transaction.getWallet().getName());
+        } else {
+            res.setWalletName("Ví không xác định");
         }
+
         if (transaction.getGroupSpace() != null) {
             res.setGroupId(transaction.getGroupSpace().getId());
             res.setGroupName(transaction.getGroupSpace().getName());
         }
+
         if (transaction.getUser() != null) {
             res.setUserId(transaction.getUser().getId());
             res.setUserName(transaction.getUser().getUsername());
         }
+
         return res;
     }
 

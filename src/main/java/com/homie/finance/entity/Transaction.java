@@ -45,25 +45,13 @@ public class Transaction {
     @JoinColumn(name = "group_space_id")
     private GroupSpace groupSpace;
 
-    private String type;
+    public String getType() {
+        return (category != null) ? category.getType() : "EXPENSE";
+    }
 
     @Column(name = "is_deleted")
     private boolean isDeleted = false;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
-
-    @PrePersist
-    public void prePersist() {
-        if (this.type == null) {
-            this.type = (this.category != null) ? this.category.getType() : "EXPENSE";
-        }
-    }
-
-    @PostLoad
-    public void postLoad() {
-        if (this.type == null && this.category != null) {
-            this.type = this.category.getType();
-        }
-    }
 }

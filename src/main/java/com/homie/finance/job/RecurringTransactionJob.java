@@ -72,7 +72,6 @@ public class RecurringTransactionJob {
                 t.setWallet(wallet);
                 t.setUser(rt.getUser());
                 t.setDeleted(false);
-                t.setType(categoryType);
                 transactionRepository.save(t);
 
                 if ("INCOME".equalsIgnoreCase(categoryType)) {

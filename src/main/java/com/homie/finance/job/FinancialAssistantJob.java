@@ -39,15 +39,19 @@ public class FinancialAssistantJob {
         // 3. Quét từng người và tính toán
         for (User user : users) {
             if (user.getEmail() == null || user.getEmail().isEmpty()) continue;
+            Double totalExpense = transactionRepository.sumTotalExpenseByUser(user, startDate, endDate);
 
-            Double totalExpense = transactionRepository.sumTotalExpenseByUserAndDateBetween(user, startDate, endDate);
             if (totalExpense == null) totalExpense = 0.0;
 
             // 4. Soạn Mail Báo Cáo
             String subject = "📊 Báo Cáo Tài Chính Tháng " + lastMonth.getMonthValue();
+
+            // Format lại số tiền nhìn cho nó chuyên nghiệp homie nhé
+            String formattedTotal = String.format("%,.0f", totalExpense);
+
             String body = "<h2>Chào " + user.getUsername() + ",</h2>" +
                     "<p>Tháng vừa qua (từ " + startDate + " đến " + endDate + "), bạn đã vung tay tiêu tốn hết:</p>" +
-                    "<h3 style='color:red;'>" + totalExpense + " VNĐ</h3>" +
+                    "<h3 style='color:red;'>" + formattedTotal + " VNĐ</h3>" +
                     "<p>Hãy mở App lên để xem chi tiết thống kê và cân đối lại tài chính tháng này nhé!</p>" +
                     "<p>Chúc homie một tháng mới rủng rỉnh tiền bạc! 💰</p>";
 
