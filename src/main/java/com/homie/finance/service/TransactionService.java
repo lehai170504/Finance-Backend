@@ -245,7 +245,7 @@ public class TransactionService {
 
     public List<TransactionResponse> getTrash() {
         User currentUser = securityUtils.getCurrentUser();
-        return transactionRepository.findTrashByUser(currentUser)
+        return transactionRepository.findTrashByUser(currentUser.getId())
                 .stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
@@ -463,8 +463,13 @@ public class TransactionService {
         }
 
         if (transaction.getGroupSpace() != null) {
-            res.setGroupId(transaction.getGroupSpace().getId());
-            res.setGroupName(transaction.getGroupSpace().getName());
+            try {
+                res.setGroupId(transaction.getGroupSpace().getId());
+                res.setGroupName(transaction.getGroupSpace().getName());
+            } catch (Exception e) {
+                res.setGroupId(null);
+                res.setGroupName(null);
+            }
         }
 
         if (transaction.getUser() != null) {

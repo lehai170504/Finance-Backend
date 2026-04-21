@@ -20,14 +20,14 @@ import java.util.Optional;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
-        @Query("SELECT t FROM Transaction t WHERE t.user = :user AND t.isDeleted = true")
-        List<Transaction> findTrashByUser(@Param("user") User user);
+        @Query("SELECT t FROM Transaction t WHERE t.user.id = :userId AND t.isDeleted = true")
+        List<Transaction> findTrashByUser(@Param("userId") String userId);
 
         @Query("SELECT t FROM Transaction t WHERE t.id = :id")
         Optional<Transaction> findByIdIncludingTrash(@Param("id") String id);
 
         // Dùng EntityGraph để fetch category ngay lập tức, tránh lỗi Lazy ở hàm getType()
-        @EntityGraph(attributePaths = {"category", "wallet"})
+        @EntityGraph(attributePaths = {"category", "wallet", "groupSpace"})
         Page<Transaction> findByUser(User user, Pageable pageable);
 
         @Query("SELECT COALESCE(SUM(t.amount), 0.0) FROM Transaction t WHERE t.category.type = :type AND t.user = :user")
@@ -36,7 +36,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
         @EntityGraph(attributePaths = {"category"})
         List<Transaction> findByUserAndCategoryType(User user, String type);
 
-        @EntityGraph(attributePaths = {"category", "wallet"})
+        @EntityGraph(attributePaths = {"category", "wallet", "groupSpace"})
         Page<Transaction> findByUserAndNoteContainingIgnoreCase(User user, String keyword, Pageable pageable);
 
         @Query("SELECT new com.homie.finance.dto.statistic.StatisticResponse(c.name, c.type, SUM(t.amount)) " +
