@@ -4,9 +4,9 @@ import com.homie.finance.entity.Notification;
 import com.homie.finance.entity.User;
 import com.homie.finance.repository.NotificationEmitterRepository;
 import com.homie.finance.repository.NotificationRepository;
-import com.homie.finance.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.homie.finance.security.SecurityUtils;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -14,27 +14,20 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
 
-    @Autowired private NotificationRepository notificationRepository;
-    @Autowired private NotificationEmitterRepository emitterRepository;
-    @Autowired private UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
+    private final NotificationEmitterRepository emitterRepository;
+    private final SecurityUtils securityUtils;
 
     // ==============================================================
-    // Tự động lấy User đang đăng nhập từ SecurityContext
-    // ==============================================================
-    private User getCurrentUser() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
-    }
-
-    // ==============================================================
-    // 1. SETUP SSE REALTIME (Controller sẽ gọi hàm này)
+    // 1. SETUP SSE REALTIME
     // ==============================================================
     public SseEmitter createSseConnection() {
-        User currentUser = getCurrentUser();
+        User currentUser = securityUtils.getCurrentUser();
         SseEmitter emitter = new SseEmitter(3600000L); // Timeout 1 tiếng
 
         emitterRepository.add(currentUser.getId(), emitter);
@@ -46,6 +39,7 @@ public class NotificationService {
         try {
             emitter.send(SseEmitter.event().name("init").data("Homie Realtime Connected!"));
         } catch (IOException e) {
+            log.error("Lỗi kết nối SSE cho User: {}", currentUser.getUsername());
             emitterRepository.remove(currentUser.getId());
         }
 
@@ -55,17 +49,18 @@ public class NotificationService {
     // ==============================================================
     // 2. LẤY DANH SÁCH & ĐẾM SỐ LƯỢNG
     // ==============================================================
+    @Transactional(readOnly = true)
     public List<Notification> getMyNotifications() {
-        return notificationRepository.findByUserOrderByCreatedAtDesc(getCurrentUser());
+        return notificationRepository.findByUserOrderByCreatedAtDesc(securityUtils.getCurrentUser());
     }
 
+    @Transactional(readOnly = true)
     public long getUnreadCount() {
-        return notificationRepository.countByUserAndIsReadFalse(getCurrentUser());
+        return notificationRepository.countByUserAndIsReadFalse(securityUtils.getCurrentUser());
     }
 
     // ==============================================================
-    // 3. TẠO THÔNG BÁO MỚI (Hàm này nhận User từ các Service khác truyền vào)
-    // Ví dụ: BudgetService thấy vượt hạn mức -> Gọi hàm này
+    // 3. TẠO THÔNG BÁO MỚI
     // ==============================================================
     @Transactional
     public void createNotification(User targetUser, String message) {
@@ -77,10 +72,12 @@ public class NotificationService {
         SseEmitter emitter = emitterRepository.get(targetUser.getId());
         if (emitter != null) {
             try {
+                // Bắn data real-time qua cho FE
                 emitter.send(SseEmitter.event()
                         .name("notification")
                         .data(savedNote));
             } catch (IOException e) {
+                log.warn("Emitter hỏng cho User: {}, tiến hành dọn dẹp.", targetUser.getUsername());
                 emitterRepository.remove(targetUser.getId());
             }
         }
@@ -91,34 +88,34 @@ public class NotificationService {
     // ==============================================================
     @Transactional
     public void markAsRead(List<String> ids) {
-        User user = getCurrentUser();
+        User user = securityUtils.getCurrentUser();
         List<Notification> notifications = notificationRepository.findByIdInAndUser(ids, user);
 
-        notifications.forEach(n -> n.setRead(true));
-        notificationRepository.saveAll(notifications);
-
-        sendUpdateSignal(user.getId(), "UPDATE_READ_STATUS");
+        if (!notifications.isEmpty()) {
+            notifications.forEach(n -> n.setRead(true));
+            notificationRepository.saveAll(notifications);
+            sendUpdateSignal(user.getId(), "UPDATE_READ_STATUS");
+        }
     }
 
     @Transactional
     public void markAllAsRead() {
-        User user = getCurrentUser();
-        List<Notification> notifications = notificationRepository.findByUserOrderByCreatedAtDesc(user);
-
-        notifications.forEach(n -> n.setRead(true));
-        notificationRepository.saveAll(notifications);
+        User user = securityUtils.getCurrentUser();
+        notificationRepository.markAllAsReadByUser(user);
 
         sendUpdateSignal(user.getId(), "UPDATE_READ_ALL");
+        log.info("User {} đã đánh dấu đọc tất cả thông báo.", user.getUsername());
     }
 
     @Transactional
     public void deleteNotifications(List<String> ids) {
-        User user = getCurrentUser();
+        User user = securityUtils.getCurrentUser();
         List<Notification> notifications = notificationRepository.findByIdInAndUser(ids, user);
 
-        notificationRepository.deleteAll(notifications);
-
-        sendUpdateSignal(user.getId(), "UPDATE_DELETE");
+        if (!notifications.isEmpty()) {
+            notificationRepository.deleteAll(notifications);
+            sendUpdateSignal(user.getId(), "UPDATE_DELETE");
+        }
     }
 
     private void sendUpdateSignal(String userId, String action) {

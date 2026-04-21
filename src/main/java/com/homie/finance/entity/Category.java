@@ -3,13 +3,17 @@ package com.homie.finance.entity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
 @Entity
 @Table(name = "categories")
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @org.hibernate.annotations.SQLRestriction("is_deleted = false")
 public class Category implements Serializable {
 
@@ -33,4 +37,11 @@ public class Category implements Serializable {
 
     @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     private boolean isDeleted = false;
+
+    public Category(String name, String type, String icon) {
+        this.name = name;
+        this.type = type;
+        this.icon = icon;
+        this.isDeleted = false;
+    }
 }

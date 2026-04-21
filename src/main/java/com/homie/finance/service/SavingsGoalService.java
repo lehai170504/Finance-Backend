@@ -1,14 +1,15 @@
 package com.homie.finance.service;
 
-import com.homie.finance.dto.SavingsGoalRequest;
-import com.homie.finance.dto.SavingsGoalResponse;
+import com.homie.finance.dto.goal.SavingsGoalRequest;
+import com.homie.finance.dto.goal.SavingsGoalResponse;
+import com.homie.finance.dto.transaction.TransactionRequest;
 import com.homie.finance.entity.SavingsGoal;
 import com.homie.finance.entity.User;
 import com.homie.finance.entity.Wallet;
 import com.homie.finance.repository.SavingsGoalRepository;
 import com.homie.finance.repository.WalletRepository;
 import com.homie.finance.security.SecurityUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,25 +17,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class SavingsGoalService {
 
-    @Autowired
-    private SavingsGoalRepository savingsGoalRepository;
-
-    @Autowired
-    private WalletRepository walletRepository;
-
-    @Autowired
-    private com.homie.finance.repository.CategoryRepository categoryRepository;
-
-    @Autowired
-    private SecurityUtils securityUtils;
-
-    @Autowired
-    private NotificationService notificationService;
-
-    @Autowired
-    private TransactionService transactionService;
+    private final SavingsGoalRepository savingsGoalRepository;
+    private final WalletRepository walletRepository;
+    private final com.homie.finance.repository.CategoryRepository categoryRepository;
+    private final SecurityUtils securityUtils;
+    private final NotificationService notificationService;
+    private final TransactionService transactionService;
 
     // 1. Lấy tất cả mục tiêu của tôi (Chưa đạt lên trên, Đã đạt xuống dưới)
     public List<SavingsGoalResponse> getMyGoals() {
@@ -106,11 +97,14 @@ public class SavingsGoalService {
 
         // Ghi log giao dịch hệ thống
         categoryRepository.findByNameIgnoreCase("Tiết kiệm").ifPresent(cat -> {
-            com.homie.finance.dto.TransactionRequest txReq = new com.homie.finance.dto.TransactionRequest();
+            TransactionRequest txReq = new TransactionRequest();
             txReq.setAmount(amount);
             txReq.setNote("Nạp tiền vào mục tiêu: " + goal.getName());
             txReq.setDate(java.time.LocalDate.now());
-            transactionService.createSystemTransaction(walletId, cat.getId(), currentUser, txReq);
+            txReq.setWalletId(walletId);
+            txReq.setCategoryId(cat.getId());
+
+            transactionService.createSystemTransaction(txReq, currentUser); // Gọi 2 tham số
         });
 
         // Kiểm tra đạt mục tiêu chưa
@@ -156,11 +150,14 @@ public class SavingsGoalService {
 
         // Ghi log giao dịch hệ thống (Thu nhập từ tiết kiệm)
         categoryRepository.findByNameIgnoreCase("Tiết kiệm").ifPresent(cat -> {
-            com.homie.finance.dto.TransactionRequest txReq = new com.homie.finance.dto.TransactionRequest();
+            TransactionRequest txReq = new TransactionRequest();
             txReq.setAmount(amount);
             txReq.setNote("Rút tiền từ mục tiêu: " + goal.getName());
             txReq.setDate(java.time.LocalDate.now());
-            transactionService.createSystemTransaction(walletId, cat.getId(), currentUser, txReq);
+            txReq.setWalletId(walletId);
+            txReq.setCategoryId(cat.getId());
+
+            transactionService.createSystemTransaction(txReq, currentUser);
         });
 
         // Nếu đã hoàn thành mà rút tiền ra thì đánh dấu chưa hoàn thành lại
@@ -212,11 +209,10 @@ public class SavingsGoalService {
         res.setColor(goal.getColor());
         res.setCompleted(goal.isCompleted());
 
-        // Tính % tiến độ, tối đa 100%
         double progress = (goal.getTargetAmount() > 0)
                 ? Math.min((goal.getSavedAmount() / goal.getTargetAmount()) * 100.0, 100.0)
                 : 0.0;
-        res.setProgressPercent(Math.round(progress * 10.0) / 10.0); // Làm tròn 1 chữ số thập phân
+        res.setProgressPercent(Math.round(progress * 10.0) / 10.0);
 
         return res;
     }

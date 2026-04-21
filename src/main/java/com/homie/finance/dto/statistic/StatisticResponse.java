@@ -1,4 +1,4 @@
-package com.homie.finance.dto;
+package com.homie.finance.dto.statistic;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.Serializable;
@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor // Bắt buộc phải có cái này để Spring ngầm định gắp dữ liệu bỏ vào
+@AllArgsConstructor
 @NoArgsConstructor
 public class StatisticResponse implements Serializable {
 

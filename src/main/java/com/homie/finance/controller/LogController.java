@@ -1,22 +1,22 @@
 package com.homie.finance.controller;
 
-import com.homie.finance.dto.ApiResponse;
+import com.homie.finance.dto.format.ApiResponse;
 import com.homie.finance.entity.TransactionLog;
 import com.homie.finance.service.LogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/logs")
+@RequiredArgsConstructor
 @Tag(name = "10. Audit Logs", description = "Quản lý nhật ký hoạt động (Dành cho cá nhân và Trưởng nhóm)")
 public class LogController {
 
-    @Autowired
-    private LogService logService;
+    private final LogService logService;
 
     // --- LOG CỦA 1 GIAO DỊCH (Chuyển từ TransactionController qua) ---
     @GetMapping("/transaction/{id}")

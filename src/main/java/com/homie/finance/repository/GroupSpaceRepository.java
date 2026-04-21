@@ -12,15 +12,14 @@ import java.util.Optional;
 public interface GroupSpaceRepository extends JpaRepository<GroupSpace, String> {
 
     // Tìm các nhóm mà User này là thành viên
-    List<GroupSpace> findByMembersContaining(User user);
+    @Query("SELECT DISTINCT g FROM GroupSpace g LEFT JOIN FETCH g.members WHERE :user MEMBER OF g.members")
+    List<GroupSpace> findByMembersContainingWithMembers(@Param("user") User user);
 
     // Tìm nhóm bằng mã mời
-    Optional<GroupSpace> findByInviteCode(String inviteCode);
+    @Query("SELECT g FROM GroupSpace g LEFT JOIN FETCH g.members WHERE g.inviteCode = :inviteCode")
+    Optional<GroupSpace> findByInviteCode(@Param("inviteCode") String inviteCode);
 
     boolean existsByNameAndOwner(String name, User owner);
-
-    // Check xem một User có thuộc Group này không (trả về boolean)
-    boolean existsByIdAndMembersContaining(String groupId, User user);
 
     @Query("SELECT g FROM GroupSpace g LEFT JOIN FETCH g.members WHERE g.id = :id")
     Optional<GroupSpace> findByIdWithMembers(@Param("id") String id);

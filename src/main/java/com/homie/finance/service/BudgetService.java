@@ -1,29 +1,27 @@
 package com.homie.finance.service;
 
-import com.homie.finance.dto.SetBudgetRequest;
+import com.homie.finance.dto.transaction.SetBudgetRequest;
 import com.homie.finance.entity.Budget;
 import com.homie.finance.entity.Category;
 import com.homie.finance.entity.User;
 import com.homie.finance.repository.BudgetRepository;
 import com.homie.finance.repository.CategoryRepository;
-import com.homie.finance.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.homie.finance.security.SecurityUtils;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class BudgetService {
 
-    @Autowired private BudgetRepository budgetRepository;
-    @Autowired private CategoryRepository categoryRepository;
-    @Autowired private UserRepository userRepository;
+    private final BudgetRepository budgetRepository;
+    private final CategoryRepository categoryRepository;
+    private final SecurityUtils securityUtils;
 
     @Transactional
     public String setBudget(SetBudgetRequest request) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+        User currentUser = securityUtils.getCurrentUser();
 
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy danh mục!"));
@@ -33,10 +31,10 @@ public class BudgetService {
         }
 
         Budget budget = budgetRepository.findByUserAndCategoryAndMonthAndYear(
-                user, category, request.getMonth(), request.getYear()
+                currentUser, category, request.getMonth(), request.getYear()
         ).orElse(new Budget());
 
-        budget.setUser(user);
+        budget.setUser(currentUser);
         budget.setCategory(category);
         budget.setMonth(request.getMonth());
         budget.setYear(request.getYear());

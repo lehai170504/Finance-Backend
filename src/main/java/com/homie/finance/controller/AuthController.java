@@ -1,18 +1,18 @@
 package com.homie.finance.controller;
 
-import com.homie.finance.dto.ApiResponse;
-import com.homie.finance.dto.AuthResponse;
-import com.homie.finance.dto.GoogleLoginRequest;
-import com.homie.finance.dto.LoginRequest;
-import com.homie.finance.dto.RegisterRequest;
-import com.homie.finance.dto.UserResponse;
-import com.homie.finance.dto.Verify2FaRequest;
+import com.homie.finance.dto.format.ApiResponse;
+import com.homie.finance.dto.auth.AuthResponse;
+import com.homie.finance.dto.auth.GoogleLoginRequest;
+import com.homie.finance.dto.auth.LoginRequest;
+import com.homie.finance.dto.auth.RegisterRequest;
+import com.homie.finance.dto.auth.UserResponse;
+import com.homie.finance.dto.auth.Verify2FaRequest;
 import com.homie.finance.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -25,12 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/auth")
 @Tag(name = "1. Authentication")
 public class AuthController {
-
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
 
     @PostMapping("/register")
     @Operation(summary = "Đăng ký tài khoản")

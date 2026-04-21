@@ -1,23 +1,23 @@
 package com.homie.finance.controller;
 
-import com.homie.finance.dto.ApiResponse;
-import com.homie.finance.dto.DebtResponse;
-import com.homie.finance.dto.GroupStatsResponse;
+import com.homie.finance.dto.format.ApiResponse;
+import com.homie.finance.dto.transaction.DebtResponse;
+import com.homie.finance.dto.group.GroupStatsResponse;
 import com.homie.finance.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/groups/details")
+@RequiredArgsConstructor
 @Tag(name = "7. Group Space Details", description = "Thống kê chi tiết, quản lý nợ nần và chia tiền trong Nhóm")
 public class GroupDetailController {
-
-    @Autowired private TransactionService transactionService;
+    private final TransactionService transactionService;
 
     @GetMapping("/{groupId}/stats")
     @Operation(

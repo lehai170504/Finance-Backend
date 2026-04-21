@@ -1,6 +1,6 @@
 package com.homie.finance.service;
 
-import com.homie.finance.dto.TransactionResponse;
+import com.homie.finance.dto.transaction.TransactionResponse;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
@@ -34,7 +34,8 @@ public class ExcelService {
                 Row row = sheet.createRow(rowIdx++);
                 row.createCell(0).setCellValue(t.getDate() != null ? t.getDate().toString() : "");
                 row.createCell(1).setCellValue(t.getCategoryName());
-                row.createCell(2).setCellValue("EXPENSE".equals(t.getCategoryType()) ? "Chi tiêu" : "Thu nhập");
+                row.createCell(2).setCellValue("EXPENSE".equals(t.getType()) ? "Chi tiêu" : "Thu nhập");
+
                 row.createCell(3).setCellValue(t.getAmount());
                 row.createCell(4).setCellValue(t.getNote() != null ? t.getNote() : "");
             }

@@ -1,21 +1,21 @@
 package com.homie.finance.controller;
 
-import com.homie.finance.dto.ApiResponse;
-import com.homie.finance.dto.SetBudgetRequest;
+import com.homie.finance.dto.format.ApiResponse;
+import com.homie.finance.dto.transaction.SetBudgetRequest;
 import com.homie.finance.service.BudgetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/budgets")
 @Tag(name = "4. Budget", description = "Cài đặt hạn mức chi tiêu (Cảnh báo vượt ngân sách)")
 public class BudgetController {
 
-    @Autowired
-    private BudgetService budgetService;
+    private final BudgetService budgetService;
 
     @PostMapping("/set")
     @Operation(summary = "Đặt Hạn mức (Ngân sách)", description = "Khóa van chi tiêu cho một danh mục cụ thể trong tháng. Nếu tiêu lố số tiền này, hệ thống sẽ báo lỗi.")

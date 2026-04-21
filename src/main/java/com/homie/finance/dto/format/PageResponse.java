@@ -1,4 +1,4 @@
-package com.homie.finance.dto;
+package com.homie.finance.dto.format;
 
 import lombok.Data;
 import java.util.List;

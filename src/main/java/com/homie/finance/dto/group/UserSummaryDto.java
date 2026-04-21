@@ -1,14 +1,13 @@
-package com.homie.finance.dto;
+package com.homie.finance.dto.group;
+
 import lombok.Builder;
 import lombok.Data;
 
 @Data
 @Builder
-public class UserResponse {
+public class UserSummaryDto {
     private String id;
     private String username;
     private String email;
-    private String role;
     private String avatarUrl;
-    private boolean is2faEnabled;
 }

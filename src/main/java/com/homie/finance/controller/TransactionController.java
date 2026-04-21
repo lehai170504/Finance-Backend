@@ -1,14 +1,18 @@
 package com.homie.finance.controller;
 
-import com.homie.finance.dto.*;
-
+import com.homie.finance.dto.format.ApiResponse;
+import com.homie.finance.dto.format.PageResponse;
+import com.homie.finance.dto.transaction.BulkTransactionRequest;
+import com.homie.finance.dto.transaction.OcrResponse;
+import com.homie.finance.dto.transaction.TransactionRequest;
+import com.homie.finance.dto.transaction.TransactionResponse;
 import com.homie.finance.service.OcrService;
 import com.homie.finance.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,13 +21,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/transactions")
+@RequiredArgsConstructor
 @Tag(name = "2. Transaction", description = "Quản lý luồng tiền ra vào (Thêm, Sửa, Xóa, Tìm kiếm, Thùng rác)")
 public class TransactionController {
 
-    @Autowired
-    private TransactionService transactionService;
-    @Autowired
-    private OcrService ocrService;
+    private final TransactionService transactionService;
+    private final OcrService ocrService;
 
     // --- NHÓM 1: LẤY DANH SÁCH & TÌM KIẾM ---
 
@@ -73,16 +76,9 @@ public class TransactionController {
     @PostMapping("/create")
     @Operation(summary = "Thêm giao dịch mới", description = "Ghi chép một khoản thu/chi. Hệ thống tự cập nhật số dư Ví và gắn vào Nhóm (nếu có).")
     public ApiResponse<TransactionResponse> createTransaction(
-            @Parameter(description = "ID của Ví (Wallet)") @RequestParam String walletId,
-
-            @Parameter(description = "ID của Danh mục (Category)") @RequestParam String categoryId,
-
-            @Parameter(description = "ID của Nhóm (Nếu có)") @RequestParam(required = false) String groupId,
-
             @Valid @RequestBody TransactionRequest request) {
 
-        // Đổi Transaction thành TransactionResponse
-        TransactionResponse data = transactionService.createTransaction(walletId, categoryId, groupId, request);
+        TransactionResponse data = transactionService.createTransaction(request);
         return new ApiResponse<>(201, "Đã ghi chép giao dịch mới!", data);
     }
 
@@ -98,12 +94,9 @@ public class TransactionController {
     @Operation(summary = "Sửa giao dịch", description = "Cập nhật lại thông tin giao dịch hoặc đổi sang ví/danh mục khác.")
     public ApiResponse<TransactionResponse> updateTransaction(
             @Parameter(description = "ID của giao dịch cần sửa") @PathVariable String id,
-            @Parameter(description = "ID Ví (Wallet) mới") @RequestParam String newWalletId,
-            @Parameter(description = "ID Danh mục (Category) mới") @RequestParam String categoryId,
             @Valid @RequestBody TransactionRequest request) {
 
-        // Đổi Transaction thành TransactionResponse
-        TransactionResponse data = transactionService.updateTransaction(id, newWalletId, categoryId, request);
+        TransactionResponse data = transactionService.updateTransaction(id, request);
         return new ApiResponse<>(200, "Cập nhật thành công!", data);
     }
 
@@ -116,7 +109,7 @@ public class TransactionController {
     }
 
     // =========================================================
-    // 🗑️ NHÓM 5: THÙNG RÁC (RECYCLE BIN)
+    // NHÓM 5: THÙNG RÁC (RECYCLE BIN)
     // =========================================================
 
     @GetMapping("/trash")
@@ -130,7 +123,6 @@ public class TransactionController {
     public ApiResponse<TransactionResponse> restoreTransaction(
             @Parameter(description = "ID của giao dịch trong thùng rác") @PathVariable String id) {
 
-        // Đổi Transaction thành TransactionResponse
         TransactionResponse data = transactionService.restoreTransaction(id);
         return new ApiResponse<>(200, "Đã khôi phục thành công!", data);
     }

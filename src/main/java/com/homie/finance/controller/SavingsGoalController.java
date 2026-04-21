@@ -1,24 +1,24 @@
 package com.homie.finance.controller;
 
-import com.homie.finance.dto.ApiResponse;
-import com.homie.finance.dto.SavingsGoalRequest;
-import com.homie.finance.dto.SavingsGoalResponse;
+import com.homie.finance.dto.format.ApiResponse;
+import com.homie.finance.dto.goal.SavingsGoalRequest;
+import com.homie.finance.dto.goal.SavingsGoalResponse;
 import com.homie.finance.service.SavingsGoalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/savings-goals")
+@RequiredArgsConstructor
 @Tag(name = "8. Savings Goals", description = "Quản lý Lợn Đất - Đặt mục tiêu và theo dõi tiến độ tiết kiệm")
 public class SavingsGoalController {
 
-        @Autowired
-        private SavingsGoalService savingsGoalService;
+        private final SavingsGoalService savingsGoalService;
 
         @GetMapping
         @Operation(summary = "Lấy danh sách mục tiêu tiết kiệm", description = "Trả về tất cả các lợn đất của bạn, sắp xếp: chưa đạt lên trên, đã hoàn thành xuống dưới.")

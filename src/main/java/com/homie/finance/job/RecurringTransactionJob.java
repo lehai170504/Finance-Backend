@@ -44,18 +44,18 @@ public class RecurringTransactionJob {
                 Wallet wallet = rt.getWallet();
 
                 if (wallet == null || wallet.isDeleted()) {
-                    log.warn("⚠️ Ví của giao dịch định kỳ {} đã bị xóa!", rt.getId());
+                    log.warn("Ví của giao dịch định kỳ {} đã bị xóa!", rt.getId());
                     failCount++;
                     continue;
                 }
 
                 String categoryType = rt.getCategory() != null ? rt.getCategory().getType() : "EXPENSE";
                 if ("EXPENSE".equalsIgnoreCase(categoryType) && wallet.getBalance() < rt.getAmount()) {
-                    log.error("❌ Không đủ số dư cho giao dịch định kỳ: {} - Số dư: {}, Cần: {}",
+                    log.error("Không đủ số dư cho giao dịch định kỳ: {} - Số dư: {}, Cần: {}",
                             rt.getNote(), wallet.getBalance(), rt.getAmount());
 
                     Notification notification = new Notification(rt.getUser(),
-                            "⚠️ Giao dịch định kỳ '" + rt.getNote() + "' thất bại! Số dư không đủ.");
+                            "Giao dịch định kỳ '" + rt.getNote() + "' thất bại! Số dư không đủ.");
                     notificationRepository.save(notification);
 
                     rt.setNextExecutionDate(rt.getNextExecutionDate().plusMonths(1));
@@ -95,14 +95,14 @@ public class RecurringTransactionJob {
                 recurringRepository.save(rt);
                 successCount++;
 
-                log.info("✅ Đã xử lý giao dịch ��ịnh kỳ: {}", rt.getNote());
+                log.info("Đã xử lý giao dịch định kỳ: {}", rt.getNote());
 
             } catch (Exception e) {
-                log.error("❌ Lỗi khi xử lý giao dịch định kỳ {}: {}", rt.getId(), e.getMessage());
+                log.error("Lỗi khi xử lý giao dịch định kỳ {}: {}", rt.getId(), e.getMessage());
                 failCount++;
             }
         }
 
-        log.info("✅ [Recurring Job] Hoàn thành: {} thành công, {} thất bại", successCount, failCount);
+        log.info("[Recurring Job] Hoàn thành: {} thành công, {} thất bại", successCount, failCount);
     }
 }

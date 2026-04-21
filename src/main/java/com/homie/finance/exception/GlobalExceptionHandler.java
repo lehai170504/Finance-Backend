@@ -1,6 +1,6 @@
 package com.homie.finance.exception;
 
-import com.homie.finance.dto.ApiResponse;
+import com.homie.finance.dto.format.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;

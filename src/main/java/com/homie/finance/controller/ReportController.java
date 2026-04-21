@@ -1,14 +1,15 @@
 package com.homie.finance.controller;
 
-import com.homie.finance.dto.ApiResponse;
-import com.homie.finance.dto.StatisticResponse;
-import com.homie.finance.dto.TransactionResponse;
+import com.homie.finance.dto.format.ApiResponse;
+import com.homie.finance.dto.statistic.StatisticResponse;
+import com.homie.finance.dto.transaction.CashFlowResponse;
+import com.homie.finance.dto.transaction.TransactionResponse;
 import com.homie.finance.service.ExcelService;
 import com.homie.finance.service.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -22,13 +23,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/reports")
+@RequiredArgsConstructor
 @Tag(name = "5. Report & Statistics", description = "Trích xuất số liệu vẽ biểu đồ và Tải báo cáo")
 public class ReportController {
 
-        @Autowired
-        private TransactionService transactionService;
-        @Autowired
-        private ExcelService excelService;
+        private final TransactionService transactionService;
+        private final ExcelService excelService;
 
         @GetMapping("/categories")
         @Operation(summary = "Thống kê cho Biểu đồ Tròn (Pie Chart)", description = "Gom nhóm và tính tổng tiền theo từng Danh mục (VD: Ăn uống: 5tr, Xăng: 1tr). Nếu không nhập ngày, mặc định lấy tháng hiện tại.")
@@ -44,11 +44,11 @@ public class ReportController {
 
         @GetMapping("/cash-flow")
         @Operation(summary = "Phân tích dòng tiền (Cash Flow Line Chart)", description = "Lấy dữ liệu Thu/Chi theo từng ngày để vẽ biểu đồ đường (Line Chart) hoặc cột (Bar Chart).")
-        public ApiResponse<List<com.homie.finance.dto.CashFlowResponse>> getCashFlowStats(
+        public ApiResponse<List<CashFlowResponse>> getCashFlowStats(
                         @Parameter(description = "Ngày bắt đầu", example = "2026-03-01") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
                         @Parameter(description = "Ngày kết thúc", example = "2026-03-31") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-                List<com.homie.finance.dto.CashFlowResponse> data = transactionService.getCashFlowStatistics(startDate,
+                List<CashFlowResponse> data = transactionService.getCashFlowStatistics(startDate,
                                 endDate);
                 String message = (startDate == null) ? "Dòng tiền tháng hiện tại"
                                 : "Dòng tiền từ " + startDate + " đến " + endDate;

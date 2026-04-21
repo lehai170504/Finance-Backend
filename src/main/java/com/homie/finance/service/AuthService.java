@@ -4,12 +4,12 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
-import com.homie.finance.dto.AuthResponse;
-import com.homie.finance.dto.GoogleLoginRequest;
-import com.homie.finance.dto.LoginRequest;
-import com.homie.finance.dto.RegisterRequest;
-import com.homie.finance.dto.UserResponse;
-import com.homie.finance.dto.Verify2FaRequest;
+import com.homie.finance.dto.auth.AuthResponse;
+import com.homie.finance.dto.auth.GoogleLoginRequest;
+import com.homie.finance.dto.auth.LoginRequest;
+import com.homie.finance.dto.auth.RegisterRequest;
+import com.homie.finance.dto.auth.UserResponse;
+import com.homie.finance.dto.auth.Verify2FaRequest;
 import com.homie.finance.entity.BlacklistedToken;
 import com.homie.finance.entity.RefreshToken;
 import com.homie.finance.entity.User;
@@ -18,7 +18,7 @@ import com.homie.finance.repository.RefreshTokenRepository;
 import com.homie.finance.repository.UserRepository;
 import com.homie.finance.utils.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,26 +33,18 @@ import java.util.Collections;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private JwtUtil jwtUtil;
-    @Autowired
-    private EmailService emailService;
-    @Autowired
-    private BlacklistedTokenRepository blacklistRepository;
-    @Autowired
-    private RefreshTokenService refreshTokenService;
-    @Autowired
-    private TwoFactorAuthService twoFactorAuthService;
-    @Autowired
-    private RefreshTokenRepository refreshTokenRepository;
-    @Autowired
-    private CloudinaryService cloudinaryService;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
+    private final EmailService emailService;
+    private final BlacklistedTokenRepository blacklistRepository;
+    private final RefreshTokenService refreshTokenService;
+    private final TwoFactorAuthService twoFactorAuthService;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Value("${google.client-id}")
     private String googleClientId;

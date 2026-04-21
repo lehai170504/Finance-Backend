@@ -1,10 +1,13 @@
 package com.homie.finance.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.homie.finance.dto.StatisticResponse;
+import com.homie.finance.dto.statistic.StatisticResponse;
+import com.homie.finance.dto.goal.SavingsGoalResponse;
 import com.homie.finance.entity.User;
 import com.homie.finance.security.SecurityUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.homie.finance.config.AiConfig;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,81 +20,73 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class AiService {
 
-    @Autowired
-    private TransactionService transactionService;
+    private final TransactionService transactionService;
+    private final SavingsGoalService savingsGoalService;
+    private final AiConfig aiConfig;
+    private final RestTemplate restTemplate;
+    private final SecurityUtils securityUtils;
 
-    @Autowired
-    private SavingsGoalService savingsGoalService;
-
-    @Autowired
-    private com.homie.finance.config.AiConfig aiConfig;
-
-    @Autowired
-    private RestTemplate restTemplate;
-
-    @Autowired
-    private SecurityUtils securityUtils;
-
-    // Hàm chung để tạo Headers có chứa API Key cho gọn code
+    // Hàm tạo Headers có chứa API Key để bảo mật đường truyền tới Python Microservice
     private HttpHeaders createHeadersWithApiKey() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // 🔥 Nhét API Key vào Header
         String apiKey = aiConfig.getApiKey();
         if (apiKey != null && !apiKey.isEmpty()) {
-            // Tùy theo Python Microservice của ông thiết kế cấu hình nhận Key tên là gì
-            // Thường dùng "X-API-Key" hoặc "Authorization"
             headers.set("X-API-Key", apiKey);
         }
         return headers;
     }
 
+    private String buildUrl(String endpoint) {
+        String baseUrl = aiConfig.getApiUrl();
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        return baseUrl + endpoint;
+    }
+
     /**
-     * Lấy lời khuyên tài chính định kỳ (Dashboard) - Gọi qua Python Microservice
+     * Lấy lời khuyên tài chính định kỳ (Dashboard)
      */
     public String getFinancialAdvice() {
         User currentUser = securityUtils.getCurrentUser();
         String contextData = getFinancialContext();
 
         try {
-            String baseUrl = aiConfig.getApiUrl();
-            if (baseUrl.endsWith("/")) {
-                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-            }
-            String url = baseUrl + "/api/ai/advice";
+            String url = buildUrl("/api/ai/advice");
 
             Map<String, Object> request = new HashMap<>();
             request.put("username", currentUser.getUsername());
             request.put("financial_context", contextData);
 
-            // 🔥 Dùng hàm tạo header ở trên
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, createHeadersWithApiKey());
 
+            log.info("Đang lấy lời khuyên AI cho user: {}", currentUser.getUsername());
             JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
-            return response.get("answer").asText();
+
+            return response != null ? response.get("answer").asText() : "AI không có phản hồi.";
 
         } catch (Exception e) {
-            return "🤖 Homie AI đang bận bảo trì bộ não Python một chút. (Lỗi: " + e.getMessage() + ")";
+            log.error("❌ Lỗi AI Advice: {}", e.getMessage());
+            return "Homie AI đang bận bảo trì bộ não Python một chút. Thử lại sau nhé!";
         }
     }
 
     /**
-     * Chat tương tác với AI hỗ trợ History - Gọi qua Python Microservice
+     * Chat tương tác với AI hỗ trợ History
      */
     public String chatWithAi(String userMessage, List<Map<String, String>> history) {
         User currentUser = securityUtils.getCurrentUser();
         String contextData = getFinancialContext();
 
         try {
-            String baseUrl = aiConfig.getApiUrl();
-            if (baseUrl.endsWith("/")) {
-                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-            }
-            String url = baseUrl + "/api/ai/chat";
+            String url = buildUrl("/api/ai/chat");
 
             Map<String, Object> request = new HashMap<>();
             request.put("username", currentUser.getUsername());
@@ -99,41 +94,44 @@ public class AiService {
             request.put("financial_context", contextData);
             request.put("history", history);
 
-            // 🔥 Dùng hàm tạo header ở trên
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, createHeadersWithApiKey());
 
+            log.info("Chatting with AI: user={}", currentUser.getUsername());
             JsonNode response = restTemplate.postForObject(url, entity, JsonNode.class);
-            return response.get("answer").asText();
+
+            return response != null ? response.get("answer").asText() : "AI im lặng một cách lạ thường...";
 
         } catch (Exception e) {
+            log.error("Lỗi AI Chat: {}", e.getMessage());
             return "Xin lỗi homie, bộ não AI Python đang hơi 'lag'. Thử lại sau nhé! 😅";
         }
     }
 
+    /**
+     * Gọi OCR để phân tích hóa đơn từ hình ảnh
+     */
     public JsonNode callGeminiAiRaw(String prompt, String base64Image, String mimeType) {
         try {
-            String baseUrl = aiConfig.getApiUrl();
-            if (baseUrl.endsWith("/")) {
-                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-            }
-            String url = baseUrl + "/api/ai/ocr";
+            String url = buildUrl("/api/ai/ocr");
 
             Map<String, Object> request = new HashMap<>();
             request.put("image_base64", base64Image);
             request.put("mime_type", mimeType);
             request.put("prompt", prompt);
 
-            // 🔥 Dùng hàm tạo header ở trên
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, createHeadersWithApiKey());
 
             return restTemplate.postForObject(url, entity, JsonNode.class);
 
         } catch (Exception e) {
-            System.err.println("Lỗi gọi OCR Microservice: " + e.getMessage());
+            log.error("Lỗi gọi OCR Microservice: {}", e.getMessage());
             return null;
         }
     }
 
+    /**
+     * Tổng hợp dữ liệu tài chính cá nhân để làm "nguyên liệu" cho AI phân tích
+     */
     private String getFinancialContext() {
         YearMonth now = YearMonth.now();
         List<StatisticResponse> stats = transactionService.getCategoryStatistics(now.atDay(1), now.atEndOfMonth());
@@ -147,20 +145,23 @@ public class AiService {
 
         String categoryDetails = stats.stream()
                 .filter(s -> "EXPENSE".equals(s.getCategoryType()))
-                .map(s -> s.getCategoryName() + ": " + String.format("%,.0f", s.getTotalAmount()) + "đ")
+                .map(s -> String.format("%s: %,.0fđ", s.getCategoryName(), s.getTotalAmount()))
                 .collect(Collectors.joining(", "));
 
-        List<com.homie.finance.dto.SavingsGoalResponse> goals = savingsGoalService.getMyGoals();
+        List<SavingsGoalResponse> goals = savingsGoalService.getMyGoals();
         String goalsSummary = goals.stream()
                 .map(g -> String.format("- %s: %,.0f/%,.0f (%s%%)", g.getName(), g.getSavedAmount(),
                         g.getTargetAmount(), g.getProgressPercent()))
                 .collect(Collectors.joining("\n"));
 
-        return String.format(
-                "- Tổng thu: %,.0fđ\n" +
-                        "- Tổng chi: %,.0fđ\n" +
-                        "- Chi tiết chi tiêu: %s\n" +
-                        "- Các mục tiêu tiết kiệm:\n%s",
-                totalIncome, totalExpense, categoryDetails, goalsSummary);
+        // Sử dụng Text Block giúp chuỗi nhìn rất chuyên nghiệp
+        return """
+               Báo cáo tài chính tháng %d/%d:
+               - Tổng thu: %,.0fđ
+               - Tổng chi: %,.0fđ
+               - Chi tiết chi tiêu: %s
+               - Các mục tiêu tiết kiệm hiện tại:
+               %s
+               """.formatted(now.getMonthValue(), now.getYear(), totalIncome, totalExpense, categoryDetails, goalsSummary);
     }
 }

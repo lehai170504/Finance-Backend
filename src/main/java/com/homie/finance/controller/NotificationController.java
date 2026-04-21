@@ -1,10 +1,11 @@
 package com.homie.finance.controller;
 
-import com.homie.finance.dto.ApiResponse;
+import com.homie.finance.dto.format.ApiResponse;
 import com.homie.finance.entity.Notification;
 import com.homie.finance.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -13,13 +14,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/notifications")
 @Tag(name = "8. Notifications", description = "Quản lý thông báo người dùng")
 public class NotificationController {
 
-    // CHỈ CẦN GỌI ĐÚNG 1 THẰNG SERVICE NÀY THÔI
-    @Autowired
-    private NotificationService notificationService;
+    private final NotificationService notificationService;
 
     @GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Đăng ký nhận thông báo Realtime (Dành cho FE EventSource)")

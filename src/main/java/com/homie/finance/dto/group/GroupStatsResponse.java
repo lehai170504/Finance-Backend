@@ -1,4 +1,4 @@
-package com.homie.finance.dto;
+package com.homie.finance.dto.group;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
