@@ -28,6 +28,7 @@ public class SavingsGoalService {
     private final TransactionService transactionService;
 
     // 1. Lấy tất cả mục tiêu của tôi (Chưa đạt lên trên, Đã đạt xuống dưới)
+    @Transactional(readOnly = true)
     public List<SavingsGoalResponse> getMyGoals() {
         User currentUser = securityUtils.getCurrentUser();
         return savingsGoalRepository.findByUserOrderByCompletedAsc(currentUser)

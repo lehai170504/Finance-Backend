@@ -250,6 +250,7 @@ public class TransactionService {
         debtRepository.deleteAll(existingDebts);
     }
 
+    @Transactional(readOnly = true)
     public List<TransactionResponse> getTrash() {
         User currentUser = securityUtils.getCurrentUser();
         return transactionRepository.findTrashByUser(currentUser.getId())
@@ -301,6 +302,7 @@ public class TransactionService {
         transactionRepository.delete(transaction);
     }
 
+    @Transactional(readOnly = true)
     public GroupStatsResponse getGroupStats(String groupId, int month, int year) {
         User currentUser = securityUtils.getCurrentUser();
         requireGroupMembership(groupId, currentUser);
@@ -327,12 +329,14 @@ public class TransactionService {
         return new GroupStatsResponse(totalExpense, byCategory, byUser);
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> getAllTransactions(int page, int size) {
         User currentUser = securityUtils.getCurrentUser();
         Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
         return mapToPageResponse(transactionRepository.findByUser(currentUser, pageable));
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> searchTransactions(String keyword, int page, int size) {
         User currentUser = securityUtils.getCurrentUser();
         Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
@@ -340,6 +344,7 @@ public class TransactionService {
                 transactionRepository.findByUserAndNoteContainingIgnoreCase(currentUser, keyword, pageable));
     }
 
+    @Transactional
     public TransactionResponse uploadReceipt(String transactionId, MultipartFile file) {
         User currentUser = securityUtils.getCurrentUser();
         Transaction transaction = transactionRepository.findById(transactionId)
@@ -358,21 +363,25 @@ public class TransactionService {
         return mapToDto(transaction);
     }
 
+    @Transactional(readOnly = true)
     public List<TransactionResponse> getAllTransactionsForExport() {
         return transactionRepository.findByUser(securityUtils.getCurrentUser(), Pageable.unpaged())
                 .getContent().stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public Double getTotalByType(String type) {
         Double total = transactionRepository.sumAmountByUserAndType(securityUtils.getCurrentUser(), type);
         return total != null ? total : 0.0;
     }
 
+    @Transactional(readOnly = true)
     public List<TransactionResponse> getTransactionsByType(String type) {
         return transactionRepository.findByUserAndCategoryType(securityUtils.getCurrentUser(), type)
                 .stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<StatisticResponse> getCategoryStatistics(LocalDate startDate, LocalDate endDate) {
         User currentUser = securityUtils.getCurrentUser();
         if (startDate == null || endDate == null) {
@@ -383,6 +392,7 @@ public class TransactionService {
         return transactionRepository.getCategoryStatistics(currentUser, startDate, endDate);
     }
 
+    @Transactional(readOnly = true)
     public List<CashFlowResponse> getCashFlowStatistics(LocalDate startDate, LocalDate endDate) {
         User currentUser = securityUtils.getCurrentUser();
         if (startDate == null || endDate == null) {
@@ -417,6 +427,7 @@ public class TransactionService {
                 });
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> getGroupTransactions(String groupId, int page, int size) {
         User currentUser = securityUtils.getCurrentUser();
         requireGroupMembership(groupId, currentUser);
