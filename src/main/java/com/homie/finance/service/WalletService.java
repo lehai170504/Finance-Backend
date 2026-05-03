@@ -170,7 +170,7 @@ public class WalletService {
     @CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public void deleteWallet(String id) {
         User currentUser = securityUtils.getCurrentUser();
-        Wallet wallet = walletRepository.findById(id).orElseThrow();
+        Wallet wallet = walletRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ví!"));
 
         if (!wallet.getUser().getId().equals(currentUser.getId())) {
             throw new RuntimeException("Bạn không có quyền xóa ví này!");

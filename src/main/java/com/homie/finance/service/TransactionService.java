@@ -61,7 +61,8 @@ public class TransactionService {
         GroupSpace group = groupSpaceRepository.findByIdWithMembers(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhóm!"));
 
-        if (group.getMembers() == null || group.getMembers().stream().noneMatch(member -> member.getId().equals(currentUser.getId()))) {
+        if (group.getMembers() == null
+                || group.getMembers().stream().noneMatch(member -> member.getId().equals(currentUser.getId()))) {
             throw new IllegalArgumentException("Bạn không có quyền truy cập nhóm này!");
         }
         return group;
@@ -124,7 +125,8 @@ public class TransactionService {
         Transaction savedTx = transactionRepository.save(transaction);
 
         logService.saveLog(savedTx.getId(), currentUser.getUsername(), "CREATE",
-                String.format("Tạo mới: %.0fđ [%s] - Danh mục: %s", savedTx.getAmount(), savedTx.getNote(), category.getName()));
+                String.format("Tạo mới: %.0fđ [%s] - Danh mục: %s", savedTx.getAmount(), savedTx.getNote(),
+                        category.getName()));
 
         if (wallet.getBalance() < 100000) {
             notificationService.createNotification(currentUser, "Ví '" + wallet.getName() + "' sắp cạn tiền rồi!");
@@ -142,7 +144,8 @@ public class TransactionService {
 
     private void processSplit(Transaction transaction, GroupSpace group) {
         Set<User> members = group.getMembers();
-        if (members.size() <= 1) return;
+        if (members.size() <= 1)
+            return;
 
         double shareAmount = Math.floor(transaction.getAmount() / members.size());
 
@@ -168,7 +171,8 @@ public class TransactionService {
     @CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public TransactionResponse updateTransaction(String id, TransactionRequest request) {
         User currentUser = securityUtils.getCurrentUser();
-        Transaction oldTx = transactionRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch!"));
+        Transaction oldTx = transactionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch!"));
         securityUtils.validateTransactionOwner(oldTx, currentUser);
 
         // Hoàn tiền lại cho ví cũ
@@ -180,14 +184,17 @@ public class TransactionService {
         }
         walletRepository.save(oldWallet);
 
-        Wallet newWallet = walletRepository.findById(request.getWalletId()).orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ví mới!"));
-        Category newCategory = categoryRepository.findById(request.getCategoryId()).orElseThrow(() -> new IllegalArgumentException("Không tìm thấy danh mục mới!"));
+        Wallet newWallet = walletRepository.findById(request.getWalletId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ví mới!"));
+        Category newCategory = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy danh mục mới!"));
 
         if (!newWallet.getUser().getId().equals(currentUser.getId())) {
             throw new IllegalArgumentException("Ví mới không thuộc về bạn!");
         }
 
-        adjustWalletBalance(newWallet, newCategory, request.getAmount(), "Ví mới không đủ số dư để thực hiện thay đổi này!");
+        adjustWalletBalance(newWallet, newCategory, request.getAmount(),
+                "Ví mới không đủ số dư để thực hiện thay đổi này!");
 
         String logDetail = String.format("Sửa: %.0f -> %.0f | Ghi chú: '%s' -> '%s'",
                 oldTx.getAmount(), request.getAmount(), oldTx.getNote(), request.getNote());
@@ -218,7 +225,8 @@ public class TransactionService {
     @CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public void deleteTransaction(String id) {
         User currentUser = securityUtils.getCurrentUser();
-        Transaction transaction = transactionRepository.findById(id).orElseThrow();
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch!"));
         securityUtils.validateTransactionOwner(transaction, currentUser);
 
         Wallet wallet = transaction.getWallet();
@@ -252,7 +260,8 @@ public class TransactionService {
     @CacheEvict(value = "wallets", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     public TransactionResponse restoreTransaction(String id) {
         User currentUser = securityUtils.getCurrentUser();
-        Transaction transaction = transactionRepository.findByIdIncludingTrash(id).orElseThrow();
+        Transaction transaction = transactionRepository.findByIdIncludingTrash(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch!"));
         securityUtils.validateTransactionOwner(transaction, currentUser);
 
         Wallet wallet = transaction.getWallet();
@@ -268,7 +277,8 @@ public class TransactionService {
 
         transaction.setDeleted(false);
         transaction.setDeletedAt(null);
-        logService.saveLog(transaction.getId(), currentUser.getUsername(), "RESTORE", "Khôi phục giao dịch từ thùng rác");
+        logService.saveLog(transaction.getId(), currentUser.getUsername(), "RESTORE",
+                "Khôi phục giao dịch từ thùng rác");
         Transaction restoredTx = transactionRepository.save(transaction);
 
         if (restoredTx.getGroupSpace() != null) {
@@ -281,7 +291,8 @@ public class TransactionService {
     @Transactional
     public void forceDeleteTransaction(String id) {
         User currentUser = securityUtils.getCurrentUser();
-        Transaction transaction = transactionRepository.findByIdIncludingTrash(id).orElseThrow();
+        Transaction transaction = transactionRepository.findByIdIncludingTrash(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch!"));
         securityUtils.validateTransactionOwner(transaction, currentUser);
 
         List<Debt> existingDebts = debtRepository.findByTransaction(transaction);
@@ -295,7 +306,8 @@ public class TransactionService {
         requireGroupMembership(groupId, currentUser);
 
         List<Transaction> transactions = transactionRepository.findAllByGroupSpaceId(groupId).stream()
-                .filter(t -> t.getDate() != null && t.getDate().getMonthValue() == month && t.getDate().getYear() == year)
+                .filter(t -> t.getDate() != null && t.getDate().getMonthValue() == month
+                        && t.getDate().getYear() == year)
                 .toList();
 
         Double totalExpense = transactions.stream()
@@ -304,11 +316,13 @@ public class TransactionService {
 
         Map<String, Double> byCategory = transactions.stream()
                 .filter(t -> t.getCategory() != null && "EXPENSE".equals(t.getCategory().getType()))
-                .collect(Collectors.groupingBy(t -> t.getCategory().getName(), Collectors.summingDouble(Transaction::getAmount)));
+                .collect(Collectors.groupingBy(t -> t.getCategory().getName(),
+                        Collectors.summingDouble(Transaction::getAmount)));
 
         Map<String, Double> byUser = transactions.stream()
                 .filter(t -> t.getUser() != null)
-                .collect(Collectors.groupingBy(t -> t.getUser().getUsername(), Collectors.summingDouble(Transaction::getAmount)));
+                .collect(Collectors.groupingBy(t -> t.getUser().getUsername(),
+                        Collectors.summingDouble(Transaction::getAmount)));
 
         return new GroupStatsResponse(totalExpense, byCategory, byUser);
     }
@@ -322,15 +336,18 @@ public class TransactionService {
     public PageResponse<TransactionResponse> searchTransactions(String keyword, int page, int size) {
         User currentUser = securityUtils.getCurrentUser();
         Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending());
-        return mapToPageResponse(transactionRepository.findByUserAndNoteContainingIgnoreCase(currentUser, keyword, pageable));
+        return mapToPageResponse(
+                transactionRepository.findByUserAndNoteContainingIgnoreCase(currentUser, keyword, pageable));
     }
 
     public TransactionResponse uploadReceipt(String transactionId, MultipartFile file) {
         User currentUser = securityUtils.getCurrentUser();
-        Transaction transaction = transactionRepository.findById(transactionId).orElseThrow();
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giao dịch!"));
         securityUtils.validateTransactionOwner(transaction, currentUser);
 
-        if (file.getSize() > 5 * 1024 * 1024) throw new IllegalArgumentException("File quá nặng! (Tối đa 5MB)");
+        if (file.getSize() > 5 * 1024 * 1024)
+            throw new IllegalArgumentException("File quá nặng! (Tối đa 5MB)");
 
         if (transaction.getReceiptUrl() != null) {
             cloudinaryService.deleteImage(transaction.getReceiptUrl());
@@ -385,12 +402,16 @@ public class TransactionService {
                     Double limit = budget.getLimitAmount();
                     LocalDate startDate = YearMonth.of(year, month).atDay(1);
                     LocalDate endDate = YearMonth.of(year, month).atEndOfMonth();
-                    Double spent = transactionRepository.sumAmountByUserAndCategoryAndDateBetween(currentUser, category, startDate, endDate);
-                    if (spent == null) spent = 0.0;
+                    Double spent = transactionRepository.sumAmountByUserAndCategoryAndDateBetween(currentUser, category,
+                            startDate, endDate);
+                    if (spent == null)
+                        spent = 0.0;
 
                     if (spent + request.getAmount() > limit) {
-                        alertService.sendBudgetAlertEmail(currentUser.getEmail(), currentUser.getUsername(), category.getName(), limit);
-                        String msg = "Cảnh báo: Bạn đã chi tiêu vượt định mức của danh mục " + category.getName() + " (Hạn mức: " + String.format("%.0f", limit) + "đ)";
+                        alertService.sendBudgetAlertEmail(currentUser.getEmail(), currentUser.getUsername(),
+                                category.getName(), limit);
+                        String msg = "Cảnh báo: Bạn đã chi tiêu vượt định mức của danh mục " + category.getName()
+                                + " (Hạn mức: " + String.format("%.0f", limit) + "đ)";
                         notificationService.createNotification(currentUser, msg);
                     }
                 });
@@ -416,7 +437,8 @@ public class TransactionService {
         debt.setSettled(true);
         debtRepository.save(debt);
 
-        String msg = currentUser.getUsername() + " đã xác nhận bạn trả xong khoản nợ " + String.format("%.0f", debt.getAmount()) + "đ.";
+        String msg = currentUser.getUsername() + " đã xác nhận bạn trả xong khoản nợ "
+                + String.format("%.0f", debt.getAmount()) + "đ.";
         notificationService.createNotification(debt.getDebtor(), msg);
     }
 
@@ -429,15 +451,18 @@ public class TransactionService {
             DebtResponse res = new DebtResponse();
             res.setId(debt.getId());
             res.setAmount(debt.getAmount());
-            if (debt.getCreditor() != null) res.setCreditorName(debt.getCreditor().getUsername());
-            if (debt.getDebtor() != null) res.setDebtorName(debt.getDebtor().getUsername());
+            if (debt.getCreditor() != null)
+                res.setCreditorName(debt.getCreditor().getUsername());
+            if (debt.getDebtor() != null)
+                res.setDebtorName(debt.getDebtor().getUsername());
             res.setSettled(debt.isSettled());
             return res;
         }).collect(Collectors.toList());
     }
 
     private TransactionResponse mapToDto(Transaction transaction) {
-        if (transaction == null) return null;
+        if (transaction == null)
+            return null;
 
         TransactionResponse res = TransactionResponse.builder()
                 .id(transaction.getId())
@@ -480,11 +505,14 @@ public class TransactionService {
     }
 
     public String suggestCategoryId(String note) {
-        if (note == null || note.length() < 2) return null;
+        if (note == null || note.length() < 2)
+            return null;
         User currentUser = securityUtils.getCurrentUser();
 
-        List<Category> suggestions = transactionRepository.findSuggestedCategory(currentUser, note, PageRequest.of(0, 1));
-        if (!suggestions.isEmpty()) return suggestions.get(0).getId();
+        List<Category> suggestions = transactionRepository.findSuggestedCategory(currentUser, note,
+                PageRequest.of(0, 1));
+        if (!suggestions.isEmpty())
+            return suggestions.get(0).getId();
 
         Map<String, String> commonMap = Map.of(
                 "starbucks", "An uong",
@@ -526,10 +554,12 @@ public class TransactionService {
         Transaction savedTx = transactionRepository.save(transaction);
 
         logService.saveLog(savedTx.getId(), "HE THONG", "CREATE_AUTO",
-                String.format("Hệ thống tự động tạo: %.0fđ [%s] - Danh mục: %s", savedTx.getAmount(), savedTx.getNote(), category.getName()));
+                String.format("Hệ thống tự động tạo: %.0fđ [%s] - Danh mục: %s", savedTx.getAmount(), savedTx.getNote(),
+                        category.getName()));
 
         if (wallet.getBalance() < 100000) {
-            notificationService.createNotification(user, "Cảnh báo: Ví '" + wallet.getName() + "' sắp cạn tiền sau khi trừ phí định kỳ!");
+            notificationService.createNotification(user,
+                    "Cảnh báo: Ví '" + wallet.getName() + "' sắp cạn tiền sau khi trừ phí định kỳ!");
         }
 
         if ("EXPENSE".equals(category.getType())) {

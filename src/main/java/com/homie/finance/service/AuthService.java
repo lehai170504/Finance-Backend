@@ -283,7 +283,8 @@ public class AuthService {
     @Transactional
     public UserResponse updateProfile(String newUsername) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(currentUsername).orElseThrow();
+        User user = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng!"));
 
         if (userRepository.existsByUsername(newUsername)) {
             throw new IllegalArgumentException("Username này đã có người dùng rồi!");
@@ -301,7 +302,8 @@ public class AuthService {
     @Transactional
     public void changePassword(String oldPassword, String newPassword) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(currentUsername).orElseThrow();
+        User user = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng!"));
 
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             throw new IllegalArgumentException("Mật khẩu cũ không chính xác!");

@@ -31,7 +31,8 @@ public class AiService {
     private final RestTemplate restTemplate;
     private final SecurityUtils securityUtils;
 
-    // Hàm tạo Headers có chứa API Key để bảo mật đường truyền tới Python Microservice
+    // Hàm tạo Headers có chứa API Key để bảo mật đường truyền tới Python
+    // Microservice
     private HttpHeaders createHeadersWithApiKey() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -55,10 +56,9 @@ public class AiService {
      * Lấy lời khuyên tài chính định kỳ (Dashboard)
      */
     public String getFinancialAdvice() {
-        User currentUser = securityUtils.getCurrentUser();
-        String contextData = getFinancialContext();
-
         try {
+            User currentUser = securityUtils.getCurrentUser();
+            String contextData = getFinancialContext();
             String url = buildUrl("/api/ai/advice");
 
             Map<String, Object> request = new HashMap<>();
@@ -82,10 +82,9 @@ public class AiService {
      * Chat tương tác với AI hỗ trợ History
      */
     public String chatWithAi(String userMessage, List<Map<String, String>> history) {
-        User currentUser = securityUtils.getCurrentUser();
-        String contextData = getFinancialContext();
-
         try {
+            User currentUser = securityUtils.getCurrentUser();
+            String contextData = getFinancialContext();
             String url = buildUrl("/api/ai/chat");
 
             Map<String, Object> request = new HashMap<>();
@@ -135,17 +134,20 @@ public class AiService {
     private String getFinancialContext() {
         YearMonth now = YearMonth.now();
         List<StatisticResponse> stats = transactionService.getCategoryStatistics(now.atDay(1), now.atEndOfMonth());
+        if (stats == null)
+            stats = List.of();
 
         double totalExpense = stats.stream()
                 .filter(s -> "EXPENSE".equals(s.getType()))
-                .mapToDouble(StatisticResponse::getTotalAmount).sum();
+                .mapToDouble(s -> s.getTotalAmount() != null ? s.getTotalAmount() : 0.0).sum();
         double totalIncome = stats.stream()
                 .filter(s -> "INCOME".equals(s.getType()))
-                .mapToDouble(StatisticResponse::getTotalAmount).sum();
+                .mapToDouble(s -> s.getTotalAmount() != null ? s.getTotalAmount() : 0.0).sum();
 
         String categoryDetails = stats.stream()
                 .filter(s -> "EXPENSE".equals(s.getType()))
-                .map(s -> String.format("%s: %,.0fđ", s.getCategoryName(), s.getTotalAmount()))
+                .map(s -> String.format("%s: %,.0fđ", s.getCategoryName(),
+                        s.getTotalAmount() != null ? s.getTotalAmount() : 0.0))
                 .collect(Collectors.joining(", "));
 
         List<SavingsGoalResponse> goals = savingsGoalService.getMyGoals();
@@ -156,12 +158,13 @@ public class AiService {
 
         // Sử dụng Text Block giúp chuỗi nhìn rất chuyên nghiệp
         return """
-               Báo cáo tài chính tháng %d/%d:
-               - Tổng thu: %,.0fđ
-               - Tổng chi: %,.0fđ
-               - Chi tiết chi tiêu: %s
-               - Các mục tiêu tiết kiệm hiện tại:
-               %s
-               """.formatted(now.getMonthValue(), now.getYear(), totalIncome, totalExpense, categoryDetails, goalsSummary);
+                Báo cáo tài chính tháng %d/%d:
+                - Tổng thu: %,.0fđ
+                - Tổng chi: %,.0fđ
+                - Chi tiết chi tiêu: %s
+                - Các mục tiêu tiết kiệm hiện tại:
+                %s
+                """.formatted(now.getMonthValue(), now.getYear(), totalIncome, totalExpense, categoryDetails,
+                goalsSummary);
     }
 }
