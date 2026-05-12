@@ -12,6 +12,13 @@ public class AiConfig {
     @Value("${ai.service.url:http://localhost:8000}")
     private String apiUrl;
 
+    @Value("${ai.service.api-key:}")
+    private String serviceApiKey;
+
+    public String getServiceApiKey() {
+        return serviceApiKey;
+    }
+
     public String getApiKey() {
         return apiKey;
     }
@@ -19,4 +26,5 @@ public class AiConfig {
     public String getApiUrl() {
         return apiUrl;
     }
+
 }

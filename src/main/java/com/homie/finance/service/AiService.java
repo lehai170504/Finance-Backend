@@ -37,7 +37,7 @@ public class AiService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        String apiKey = aiConfig.getApiKey();
+        String apiKey = aiConfig.getServiceApiKey();
         if (apiKey != null && !apiKey.isEmpty()) {
             headers.set("X-API-Key", apiKey);
         }
