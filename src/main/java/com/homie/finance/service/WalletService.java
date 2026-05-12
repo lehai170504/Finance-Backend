@@ -120,7 +120,7 @@ public class WalletService {
         txOut.setCategory(transferOutCat);
         txOut.setWallet(fromWallet);
         txOut.setUser(user);
-        // txOut.setType("EXPENSE"); // Nếu Entity của ông có field type thì set thêm vào đây
+        txOut.setExcludeFromReport(true);
         transactionRepository.save(txOut);
 
         // 3. Tạo giao dịch nhận về (txIn)
@@ -131,7 +131,7 @@ public class WalletService {
         txIn.setCategory(transferInCat);
         txIn.setWallet(toWallet);
         txIn.setUser(user);
-        // txIn.setType("INCOME");
+        txIn.setExcludeFromReport(true);
         transactionRepository.save(txIn);
     }
 

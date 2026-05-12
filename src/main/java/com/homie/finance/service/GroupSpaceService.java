@@ -4,7 +4,9 @@ import com.homie.finance.dto.group.GroupRequest;
 import com.homie.finance.dto.group.GroupSpaceResponse;
 import com.homie.finance.dto.group.UserSummaryDto;
 import com.homie.finance.entity.GroupSpace;
+import com.homie.finance.entity.Transaction;
 import com.homie.finance.entity.User;
+import com.homie.finance.repository.DebtRepository;
 import com.homie.finance.repository.GroupSpaceRepository;
 import com.homie.finance.repository.TransactionRepository;
 import com.homie.finance.repository.UserRepository;
@@ -25,44 +27,47 @@ public class GroupSpaceService {
 
     private final GroupSpaceRepository groupSpaceRepository;
     private final UserRepository userRepository;
-    private final com.homie.finance.repository.DebtRepository debtRepository;
+    private final DebtRepository debtRepository;
     private final TransactionRepository transactionRepository;
 
-    // Lấy User hiện tại từ Token (Giữ nguyên, dùng nội bộ)
     private User getCurrentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
     }
 
-    // 1. Tạo nhóm mới (Đổi String -> GroupRequest, Trả về GroupSpaceResponse)
     @Transactional
     public GroupSpaceResponse createGroup(GroupRequest request) {
         User me = getCurrentUser();
+        String groupName = normalizeGroupName(request.getName());
 
-        if (groupSpaceRepository.existsByNameAndOwner(request.getName(), me)) {
-            throw new IllegalArgumentException("Homie đã có một nhóm tên '" + request.getName() + "' rồi!");
+        if (groupSpaceRepository.existsByNameAndOwner(groupName, me)) {
+            throw new IllegalArgumentException("Homie đã có một nhóm tên '" + groupName + "' rồi!");
         }
 
         GroupSpace group = new GroupSpace();
-        group.setName(request.getName());
+        group.setName(groupName);
         group.setOwner(me);
-        group.setInviteCode(UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+        group.setInviteCode(generateInviteCode());
 
         Set<User> members = new HashSet<>();
         members.add(me);
         group.setMembers(members);
 
         GroupSpace savedGroup = groupSpaceRepository.save(group);
-        return mapToResponse(savedGroup); // Map sang DTO
+        return mapToResponse(savedGroup);
     }
 
-    // 2. Tham gia nhóm bằng Mã Code
     @Transactional
     public GroupSpaceResponse joinGroup(String inviteCode) {
         User me = getCurrentUser();
 
-        GroupSpace group = groupSpaceRepository.findByInviteCode(inviteCode.toUpperCase())
+        if (inviteCode == null || inviteCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("Mã mời không được để trống!");
+        }
+
+        GroupSpace group = groupSpaceRepository.findByInviteCode(inviteCode.trim().toUpperCase())
                 .orElseThrow(() -> new IllegalArgumentException("Mã mời không hợp lệ!"));
 
         if (group.getMembers().contains(me)) {
@@ -70,26 +75,25 @@ public class GroupSpaceService {
         }
 
         group.getMembers().add(me);
+
         GroupSpace savedGroup = groupSpaceRepository.save(group);
-        return mapToResponse(savedGroup); // Map sang DTO
+        return mapToResponse(savedGroup);
     }
 
-    // 3. Lấy danh sách nhóm của tôi
     @Transactional(readOnly = true)
     public List<GroupSpaceResponse> getMyGroups() {
         User me = getCurrentUser();
-        List<GroupSpace> groups = groupSpaceRepository.findByMembersContainingWithMembers(me);
 
-        // Convert cả list Entity sang list DTO
-        return groups.stream()
+        return groupSpaceRepository.findByMembersContainingWithMembers(me)
+                .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    // 4. Chỉnh sửa tên nhóm
     @Transactional
     public GroupSpaceResponse updateGroup(String groupId, GroupRequest request) {
         User me = getCurrentUser();
+        String newName = normalizeGroupName(request.getName());
 
         GroupSpace group = groupSpaceRepository.findByIdWithMembers(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhóm!"));
@@ -98,20 +102,22 @@ public class GroupSpaceService {
             throw new RuntimeException("Chỉ chủ nhóm mới có quyền đổi tên!");
         }
 
-        if (groupSpaceRepository.existsByNameAndOwner(request.getName(), me)) {
+        boolean isSameName = group.getName() != null && group.getName().equalsIgnoreCase(newName);
+
+        if (!isSameName && groupSpaceRepository.existsByNameAndOwner(newName, me)) {
             throw new IllegalArgumentException("Tên nhóm này homie đã sử dụng rồi!");
         }
 
-        group.setName(request.getName());
+        group.setName(newName);
+
         GroupSpace savedGroup = groupSpaceRepository.save(group);
         return mapToResponse(savedGroup);
     }
 
-    // 5. Giải tán nhóm (Return void nên không cần sửa)
     @Transactional
     public void deleteGroup(String groupId) {
-        // ... (Giữ nguyên logic cũ của ông)
         User me = getCurrentUser();
+
         GroupSpace group = groupSpaceRepository.findByIdWithMembers(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhóm!"));
 
@@ -119,19 +125,24 @@ public class GroupSpaceService {
             throw new RuntimeException("Chỉ chủ nhóm mới được giải tán nhóm!");
         }
 
+        List<Transaction> transactions = transactionRepository.findByGroupSpace(group);
+        for (Transaction transaction : transactions) {
+            transaction.setGroupSpace(null);
+        }
+        transactionRepository.saveAll(transactions);
+
+        debtRepository.deleteByGroup(group);
+
         group.getMembers().clear();
         groupSpaceRepository.save(group);
 
-        debtRepository.deleteByGroup(group);
-        transactionRepository.deleteByGroupSpace(group);
         groupSpaceRepository.delete(group);
     }
 
-    // 6. Rời khỏi nhóm (Return void nên không cần sửa)
     @Transactional
     public void leaveGroup(String groupId) {
-        // ... (Giữ nguyên logic cũ của ông)
         User me = getCurrentUser();
+
         GroupSpace group = groupSpaceRepository.findByIdWithMembers(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Nhóm không tồn tại!"));
 
@@ -143,17 +154,20 @@ public class GroupSpaceService {
             throw new IllegalArgumentException("Homie không phải thành viên nhóm này!");
         }
 
-        if (debtRepository.existsByGroupAndDebtorAndIsSettledFalse(group, me) ||
-                debtRepository.existsByGroupAndCreditorAndIsSettledFalse(group, me)) {
+        boolean hasUnsettledDebt =
+                debtRepository.existsByGroupAndDebtorAndIsSettledFalse(group, me)
+                        || debtRepository.existsByGroupAndCreditorAndIsSettledFalse(group, me);
+
+        if (hasUnsettledDebt) {
             throw new IllegalArgumentException(
-                    "Bạn cần thanh toán hoặc được thanh toán hết các khoản nợ trong nhóm trước khi rời đi!");
+                    "Bạn cần thanh toán hoặc được thanh toán hết các khoản nợ trong nhóm trước khi rời đi!"
+            );
         }
 
         group.getMembers().remove(me);
         groupSpaceRepository.save(group);
     }
 
-    // 7. Lấy chi tiết nhóm
     @Transactional(readOnly = true)
     public GroupSpaceResponse getGroupById(String groupId) {
         User me = getCurrentUser();
@@ -168,11 +182,7 @@ public class GroupSpaceService {
         return mapToResponse(group);
     }
 
-    // ==========================================
-    // HÀM CHUYỂN ĐỔI ENTITY -> DTO
-    // ==========================================
     private GroupSpaceResponse mapToResponse(GroupSpace group) {
-        // Map Owner
         UserSummaryDto ownerDto = UserSummaryDto.builder()
                 .id(group.getOwner().getId())
                 .username(group.getOwner().getUsername())
@@ -180,17 +190,16 @@ public class GroupSpaceService {
                 .avatarUrl(group.getOwner().getAvatarUrl())
                 .build();
 
-        // Map danh sách Members
-        List<UserSummaryDto> memberDtos = group.getMembers().stream()
-                .map(m -> UserSummaryDto.builder()
-                        .id(m.getId())
-                        .username(m.getUsername())
-                        .email(m.getEmail())
-                        .avatarUrl(m.getAvatarUrl())
+        List<UserSummaryDto> memberDtos = group.getMembers()
+                .stream()
+                .map(member -> UserSummaryDto.builder()
+                        .id(member.getId())
+                        .username(member.getUsername())
+                        .email(member.getEmail())
+                        .avatarUrl(member.getAvatarUrl())
                         .build())
                 .collect(Collectors.toList());
 
-        // Build Response tổng
         return GroupSpaceResponse.builder()
                 .id(group.getId())
                 .name(group.getName())
@@ -199,5 +208,21 @@ public class GroupSpaceService {
                 .owner(ownerDto)
                 .members(memberDtos)
                 .build();
+    }
+
+    private String normalizeGroupName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tên nhóm không được để trống!");
+        }
+
+        return name.trim();
+    }
+
+    private String generateInviteCode() {
+        return UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 6)
+                .toUpperCase();
     }
 }

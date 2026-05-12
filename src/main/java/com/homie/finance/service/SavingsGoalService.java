@@ -96,18 +96,6 @@ public class SavingsGoalService {
         double newSaved = goal.getSavedAmount() + amount;
         goal.setSavedAmount(newSaved);
 
-        // Ghi log giao dịch hệ thống
-        categoryRepository.findByNameIgnoreCase("Tiết kiệm").ifPresent(cat -> {
-            TransactionRequest txReq = new TransactionRequest();
-            txReq.setAmount(amount);
-            txReq.setNote("Nạp tiền vào mục tiêu: " + goal.getName());
-            txReq.setDate(java.time.LocalDate.now());
-            txReq.setWalletId(walletId);
-            txReq.setCategoryId(cat.getId());
-
-            transactionService.createSystemTransaction(txReq, currentUser); // Gọi 2 tham số
-        });
-
         // Kiểm tra đạt mục tiêu chưa
         if (newSaved >= goal.getTargetAmount()) {
             goal.setCompleted(true);
@@ -148,18 +136,6 @@ public class SavingsGoalService {
 
         // Trừ khỏi lợn đất
         goal.setSavedAmount(goal.getSavedAmount() - amount);
-
-        // Ghi log giao dịch hệ thống (Thu nhập từ tiết kiệm)
-        categoryRepository.findByNameIgnoreCase("Tiết kiệm").ifPresent(cat -> {
-            TransactionRequest txReq = new TransactionRequest();
-            txReq.setAmount(amount);
-            txReq.setNote("Rút tiền từ mục tiêu: " + goal.getName());
-            txReq.setDate(java.time.LocalDate.now());
-            txReq.setWalletId(walletId);
-            txReq.setCategoryId(cat.getId());
-
-            transactionService.createSystemTransaction(txReq, currentUser);
-        });
 
         // Nếu đã hoàn thành mà rút tiền ra thì đánh dấu chưa hoàn thành lại
         if (goal.isCompleted() && goal.getSavedAmount() < goal.getTargetAmount()) {

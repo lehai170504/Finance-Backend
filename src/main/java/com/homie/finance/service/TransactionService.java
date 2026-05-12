@@ -417,7 +417,7 @@ public class TransactionService {
                     if (spent == null)
                         spent = 0.0;
 
-                    if (spent + request.getAmount() > limit) {
+                    if (spent > limit) {
                         alertService.sendBudgetAlertEmail(currentUser.getEmail(), currentUser.getUsername(),
                                 category.getName(), limit);
                         String msg = "Cảnh báo: Bạn đã chi tiêu vượt định mức của danh mục " + category.getName()

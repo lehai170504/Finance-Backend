@@ -46,6 +46,9 @@ public class Transaction {
     @JoinColumn(name = "group_space_id")
     private GroupSpace groupSpace;
 
+    @Column(name = "exclude_from_report")
+    private boolean excludeFromReport = false;
+
     @Transient
     @JsonIgnore
     public String getType() {

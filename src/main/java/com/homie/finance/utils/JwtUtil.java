@@ -13,12 +13,17 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    private final String SECRET_KEY = "DayLaMotCaiKhoaBiMatCucKyDaiVaKhoDoanDeBaoMatToiThieu256Bits";
-    private final long EXPIRATION_TIME = 86400000; // 24h
-    private final long TEMP_EXPIRATION_TIME = 300000; // 5 phút (dành cho 2FA)
+    @org.springframework.beans.factory.annotation.Value("${jwt.secret}")
+    private String secretKey;
+
+    @org.springframework.beans.factory.annotation.Value("${jwt.expiration:86400000}")
+    private long expirationTime;
+
+    @org.springframework.beans.factory.annotation.Value("${jwt.temp-expiration:300000}")
+    private long tempExpirationTime;
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+        return Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
     // 1. TẠO TOKEN CHÍNH THỨC (Dùng cho mọi API)
@@ -26,7 +31,7 @@ public class JwtUtil {
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -37,7 +42,7 @@ public class JwtUtil {
                 .setSubject(userId)
                 .claim("isTemp", true)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + TEMP_EXPIRATION_TIME))
+                .setExpiration(new Date(System.currentTimeMillis() + tempExpirationTime))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

@@ -20,6 +20,7 @@ import java.util.Optional;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, String> {
+
         @EntityGraph(attributePaths = { "category", "wallet", "groupSpace", "user" })
         @Query("SELECT t FROM Transaction t WHERE t.user.id = :userId AND t.isDeleted = true")
         List<Transaction> findTrashByUser(@Param("userId") String userId);
@@ -27,12 +28,14 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
         @Query("SELECT t FROM Transaction t WHERE t.id = :id")
         Optional<Transaction> findByIdIncludingTrash(@Param("id") String id);
 
-        // Dùng EntityGraph để fetch category ngay lập tức, tránh lỗi Lazy ở hàm
-        // getType()
         @EntityGraph(attributePaths = { "category", "wallet", "groupSpace", "user" })
         Page<Transaction> findByUser(User user, Pageable pageable);
 
-        @Query("SELECT COALESCE(SUM(t.amount), 0.0) FROM Transaction t WHERE t.category.type = :type AND t.user = :user")
+        @Query("SELECT COALESCE(SUM(t.amount), 0.0) FROM Transaction t " +
+                "WHERE t.category.type = :type " +
+                "AND t.user = :user " +
+                "AND t.isDeleted = false " +
+                "AND t.excludeFromReport = false")
         Double sumAmountByUserAndType(@Param("user") User user, @Param("type") String type);
 
         @EntityGraph(attributePaths = { "category", "wallet", "groupSpace", "user" })
@@ -42,53 +45,76 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
         Page<Transaction> findByUserAndNoteContainingIgnoreCase(User user, String keyword, Pageable pageable);
 
         @Query("SELECT new com.homie.finance.dto.statistic.StatisticResponse(c.name, c.type, SUM(t.amount)) " +
-                        "FROM Transaction t JOIN t.category c " +
-                        "WHERE t.user = :user AND t.date BETWEEN :startDate AND :endDate " +
-                        "GROUP BY c.name, c.type")
+                "FROM Transaction t JOIN t.category c " +
+                "WHERE t.user = :user " +
+                "AND t.isDeleted = false " +
+                "AND t.excludeFromReport = false " +
+                "AND t.date BETWEEN :startDate AND :endDate " +
+                "GROUP BY c.name, c.type")
         List<StatisticResponse> getCategoryStatistics(
-                        @Param("user") User user,
-                        @Param("startDate") LocalDate startDate,
-                        @Param("endDate") LocalDate endDate);
+                @Param("user") User user,
+                @Param("startDate") LocalDate startDate,
+                @Param("endDate") LocalDate endDate
+        );
 
         @Query("SELECT new com.homie.finance.dto.transaction.CashFlowResponse(t.date, " +
-                        "SUM(CASE WHEN c.type = 'INCOME' THEN t.amount ELSE 0.0 END), " +
-                        "SUM(CASE WHEN c.type = 'EXPENSE' THEN t.amount ELSE 0.0 END)) " +
-                        "FROM Transaction t JOIN t.category c " +
-                        "WHERE t.user = :user AND t.date BETWEEN :startDate AND :endDate " +
-                        "GROUP BY t.date " +
-                        "ORDER BY t.date ASC")
+                "SUM(CASE WHEN c.type = 'INCOME' THEN t.amount ELSE 0.0 END), " +
+                "SUM(CASE WHEN c.type = 'EXPENSE' THEN t.amount ELSE 0.0 END)) " +
+                "FROM Transaction t JOIN t.category c " +
+                "WHERE t.user = :user " +
+                "AND t.isDeleted = false " +
+                "AND t.excludeFromReport = false " +
+                "AND t.date BETWEEN :startDate AND :endDate " +
+                "GROUP BY t.date " +
+                "ORDER BY t.date ASC")
         List<CashFlowResponse> getCashFlowStatistics(
-                        @Param("user") User user,
-                        @Param("startDate") LocalDate startDate,
-                        @Param("endDate") LocalDate endDate);
+                @Param("user") User user,
+                @Param("startDate") LocalDate startDate,
+                @Param("endDate") LocalDate endDate
+        );
 
         @Query("SELECT COALESCE(SUM(t.amount), 0.0) FROM Transaction t " +
-                        "WHERE t.user = :user " +
-                        "AND t.category.type = 'EXPENSE' " +
-                        "AND t.date BETWEEN :startDate AND :endDate")
-        Double sumTotalExpenseByUser(@Param("user") User user,
-                        @Param("startDate") LocalDate startDate,
-                        @Param("endDate") LocalDate endDate);
+                "WHERE t.user = :user " +
+                "AND t.isDeleted = false " +
+                "AND t.excludeFromReport = false " +
+                "AND t.category.type = 'EXPENSE' " +
+                "AND t.date BETWEEN :startDate AND :endDate")
+        Double sumTotalExpenseByUser(
+                @Param("user") User user,
+                @Param("startDate") LocalDate startDate,
+                @Param("endDate") LocalDate endDate
+        );
 
-        @Query("SELECT COALESCE(SUM(t.amount), 0.0) FROM Transaction t WHERE t.user = :user AND t.category = :category AND t.date BETWEEN :startDate AND :endDate")
+        @Query("SELECT COALESCE(SUM(t.amount), 0.0) FROM Transaction t " +
+                "WHERE t.user = :user " +
+                "AND t.isDeleted = false " +
+                "AND t.excludeFromReport = false " +
+                "AND t.category = :category " +
+                "AND t.date BETWEEN :startDate AND :endDate")
         Double sumAmountByUserAndCategoryAndDateBetween(
-                        @Param("user") User user,
-                        @Param("category") Category category,
-                        @Param("startDate") LocalDate startDate,
-                        @Param("endDate") LocalDate endDate);
+                @Param("user") User user,
+                @Param("category") Category category,
+                @Param("startDate") LocalDate startDate,
+                @Param("endDate") LocalDate endDate
+        );
 
         @EntityGraph(attributePaths = { "category", "wallet", "groupSpace", "user" })
         Page<Transaction> findByGroupSpaceId(String groupSpaceId, Pageable pageable);
 
         @Query("SELECT t.category FROM Transaction t " +
-                        "WHERE t.user = :user " +
-                        "AND LOWER(t.note) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-                        "ORDER BY t.date DESC")
-        List<Category> findSuggestedCategory(@Param("user") User user, @Param("keyword") String keyword,
-                        Pageable pageable);
+                "WHERE t.user = :user " +
+                "AND t.isDeleted = false " +
+                "AND LOWER(t.note) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+                "ORDER BY t.date DESC")
+        List<Category> findSuggestedCategory(
+                @Param("user") User user,
+                @Param("keyword") String keyword,
+                Pageable pageable
+        );
 
         @EntityGraph(attributePaths = { "category", "wallet", "groupSpace", "user" })
         List<Transaction> findAllByGroupSpaceId(String groupSpaceId);
 
-        void deleteByGroupSpace(GroupSpace groupSpace);
+        @EntityGraph(attributePaths = { "category", "wallet", "groupSpace", "user" })
+        List<Transaction> findByGroupSpace(GroupSpace groupSpace);
 }
